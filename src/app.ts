@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto'
+import path from 'node:path'
 import Fastify, {
   type FastifyInstance,
   type FastifyServerOptions,
 } from 'fastify'
 import type { PrismaClient } from '@prisma/client'
+import swagger from '@fastify/swagger'
+import swaggerUi from '@fastify/swagger-ui'
 
 import { env } from './config/env'
 import type { Relogio } from './domain/relogio'
@@ -62,6 +65,34 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
       (requisicao.headers['x-request-id'] as string | undefined) ?? randomUUID(),
   })
 
+  // --------------------------- Documentação (Swagger) -----------------------
+  // Aqui a API publica o próprio contrato em /docs.
+  //
+  // O arquivo docs/openapi.yaml é a fonte da verdade: o Swagger UI só lê esse
+  // arquivo e desenha a tela. Não geramos o contrato a partir das rotas para
+  // não ter dois lugares diferentes dizendo a mesma coisa.
+  //
+  // `__dirname` aponta para src/ em desenvolvimento e para dist/ no build.
+  // Nos dois casos, ".." cai na raiz do projeto, onde fica a pasta docs/.
+  const caminhoDoOpenApi = path.join(__dirname, '..', 'docs', 'openapi.yaml')
+
+  app.register(swagger, {
+    mode: 'static',
+    specification: {
+      path: caminhoDoOpenApi,
+      baseDir: path.dirname(caminhoDoOpenApi),
+    },
+  })
+
+  app.register(swaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: {
+      docExpansion: 'list', // mostra a lista de rotas já aberta
+      deepLinking: true, // cada rota tem um link próprio
+      persistAuthorization: true, // não perde o token ao recarregar
+    },
+  })
+
   // ------------------------- Observabilidade -------------------------------
   const registro = criarRegistroDeMetricas()
   const metricas = criarMetricas(registro)
@@ -72,6 +103,9 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
 
   app.addHook('onResponse', async (requisicao, resposta) => {
     const rota = requisicao.routeOptions.url ?? 'desconhecida'
+    // A documentação carrega vários arquivos estáticos (JS, CSS, imagem).
+    // Ignoramos tudo em /docs para não poluir as métricas de negócio.
+    if (rota.startsWith('/docs')) return
     if (rotasIgnoradas.has(rota)) return
 
     const duracaoMs = resposta.elapsedTime
@@ -124,9 +158,11 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
   app.get('/', async () => ({
     nome: 'API de Empréstimos de Biblioteca',
     nivel: 'Projeto B — Full Cycle',
+    documentacao: '/docs',
     rotas: [
       'GET /health',
       'GET /metrics',
+      'GET /docs',
       'POST /livros',
       'GET /livros',
       'POST /usuarios',

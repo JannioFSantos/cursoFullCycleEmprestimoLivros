@@ -90,6 +90,9 @@ curl -i https://seu-dominio.com/health
 
 Deve voltar `200` com `{"status":"ok"}`.
 
+A documentação Swagger fica em `https://seu-dominio.com/docs`. Ela lê o
+`docs/openapi.yaml` que vai junto na imagem Docker.
+
 Depois teste uma rota de verdade:
 
 ```bash

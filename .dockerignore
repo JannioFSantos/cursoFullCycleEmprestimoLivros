@@ -7,6 +7,5 @@ coverage
 .env.*
 !.env.example
 *.log
-docs
 k6
 tests

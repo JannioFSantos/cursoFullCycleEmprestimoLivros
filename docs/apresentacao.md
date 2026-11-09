@@ -34,6 +34,10 @@ Mostrar a primeira linha do README: `Nível: Projeto B`.
 
 ## Minuto 1 a 4 — Demonstração
 
+> Antes de digitar curl, posso abrir `http://localhost:3000/docs` e mostrar a
+> documentação Swagger. Ela lista as rotas e deixa testar pelo botão
+> **Try it out**.
+
 Cadastrar livro, usuário e emprestar:
 
 ```bash

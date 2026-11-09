@@ -36,6 +36,7 @@ isso usei uma transação no banco com `SELECT ... FOR UPDATE`.
 - **Vitest** — testes;
 - **pino** — logs (já vem dentro do Fastify);
 - **prom-client** — métricas para o Prometheus;
+- **Swagger** — documentação interativa em `/docs`;
 - **k6** — teste de carga;
 - **Docker Compose** — subir tudo com um comando.
 
@@ -144,13 +145,30 @@ Para testar a regra do último exemplar, cadastre um segundo usuário e tente
 emprestar o mesmo livro. A resposta vai ser `409` com o código
 `LIVRO_INDISPONIVEL`.
 
-As rotas e os formatos de resposta estão em `docs/openapi.yaml`.
+## Documentação da API (Swagger)
+
+A própria API publica a documentação dela. Com a API rodando, abra no
+navegador:
+
+```
+http://localhost:3000/docs
+```
+
+Nessa tela dá para ver todas as rotas, os dados que cada uma recebe, as
+respostas e até testar direto pelo botão **Try it out**.
+
+O contrato fica no arquivo `docs/openapi.yaml`. É o mesmo arquivo que o
+Swagger mostra e que o CI valida com o Spectral. Se quiser o contrato em JSON,
+basta acessar `/docs/json`.
+
+Em produção fica no mesmo endereço da API:
+`https://seu-dominio.com/docs`.
 
 ## Testes
 
 ```bash
 npm run test:unit          # 24 testes, sem banco, roda em ~1s
-npm run test:integration   # 9 testes, com banco real
+npm run test:integration   # 10 testes, com banco real
 npm run test:coverage      # tudo + cobertura
 ```
 
@@ -161,6 +179,7 @@ O que os testes cobrem:
 - as três regras de recusa: sem exemplar, atraso e limite de 3;
 - livro, usuário ou empréstimo que não existe (404);
 - devolver o mesmo empréstimo duas vezes (409);
+- a documentação Swagger respondendo em `/docs`;
 - o fluxo completo passando por HTTP e banco de verdade.
 
 A cobertura é medida só em `src/domain` e `src/use-cases`, que é onde ficam as

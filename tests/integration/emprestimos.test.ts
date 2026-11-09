@@ -104,6 +104,19 @@ describe('API de empréstimos (integração)', () => {
     expect(resposta.json()).toMatchObject({ status: 'ok' })
   })
 
+  it('publica a documentação Swagger em /docs', async () => {
+    const pagina = await app.inject({ method: 'GET', url: '/docs/' })
+
+    expect(pagina.statusCode).toBe(200)
+    expect(pagina.body.toLowerCase()).toContain('swagger')
+
+    // /docs/json é o mesmo contrato, em JSON, que o Swagger UI carrega.
+    const contrato = await app.inject({ method: 'GET', url: '/docs/json' })
+
+    expect(contrato.statusCode).toBe(200)
+    expect(contrato.json()).toMatchObject({ openapi: '3.1.0' })
+  })
+
   it('empresta um livro e calcula a data prevista', async () => {
     const livro = await criarLivro(1)
     const usuario = await criarUsuario()

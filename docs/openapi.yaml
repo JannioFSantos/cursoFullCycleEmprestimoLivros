@@ -23,6 +23,8 @@ info:
     identifier: MIT
 
 servers:
+  - url: /
+    description: Mesmo servidor desta página (funciona local e em produção)
   - url: http://localhost:3000
     description: Ambiente local (docker compose)
   - url: https://api.seu-dominio.com
