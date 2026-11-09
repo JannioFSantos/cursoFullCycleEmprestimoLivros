@@ -5,7 +5,7 @@ import type {
   LivroComDisponibilidade,
   Usuario,
 } from './entidades'
-import type { EstadoParaEmprestar } from './regras'
+import type { EstadoParaEmprestar, EstadoParaAtualizarLivro } from './regras'
 
 /**
  * Portas (interfaces) de acesso a dados.
@@ -40,6 +40,22 @@ export interface LivroRepositorio {
   criar(dados: DadosNovoLivro): Promise<Livro>
   buscarPorId(id: string): Promise<Livro | null>
   listarComDisponibilidade(): Promise<LivroComDisponibilidade[]>
+
+  /**
+   * Atualiza o livro com a linha travada (FOR UPDATE). O `validar` recebe a
+   * quantidade de empréstimos ativos e pode recusar a redução de exemplares.
+   */
+  atualizarComBloqueio(
+    id: string,
+    dados: DadosNovoLivro,
+    validar: (estado: EstadoParaAtualizarLivro) => void,
+  ): Promise<Livro>
+
+  /** Exclui o livro se `validar` aceitar. Recebe o total de empréstimos. */
+  excluirComBloqueio(
+    id: string,
+    validar: (emprestimosRegistrados: number) => void,
+  ): Promise<void>
 }
 
 export interface UsuarioRepositorio {
@@ -47,6 +63,12 @@ export interface UsuarioRepositorio {
   buscarPorId(id: string): Promise<Usuario | null>
   /** Lista todos os usuários em ordem alfabética (usado na tela e na API). */
   listar(): Promise<Usuario[]>
+  atualizar(id: string, dados: DadosNovoUsuario): Promise<Usuario>
+  /** Exclui o usuário se `validar` aceitar. Recebe o total de empréstimos. */
+  excluirComBloqueio(
+    id: string,
+    validar: (emprestimosRegistrados: number) => void,
+  ): Promise<void>
 }
 
 export interface EmprestimoRepositorio {

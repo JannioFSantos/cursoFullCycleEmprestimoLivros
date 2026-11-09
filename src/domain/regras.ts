@@ -69,6 +69,43 @@ export interface EstadoParaEmprestar {
   usuarioTemAtraso: boolean
 }
 
+/** Estado do livro no momento de editar a quantidade de exemplares. */
+export interface EstadoParaAtualizarLivro {
+  exemplaresTotal: number
+  emprestimosAtivos: number
+}
+
+/**
+ * Não deixa reduzir os exemplares abaixo do que já está emprestado.
+ * Ex.: o livro tem 3 exemplares e 2 ativos; o mínimo agora é 2.
+ */
+export function validarAtualizacaoDeLivro(estado: EstadoParaAtualizarLivro): void {
+  if (estado.exemplaresTotal < estado.emprestimosAtivos) {
+    throw erros.exemplaresAbaixoDosEmprestimos(
+      estado.exemplaresTotal,
+      estado.emprestimosAtivos,
+    )
+  }
+}
+
+/**
+ * Livro com qualquer empréstimo (ativo ou devolvido) não pode ser excluído.
+ * Escolhi bloquear com histórico também para não apagar o passado: o
+ * empréstimo é um registro que a biblioteca precisa guardar.
+ */
+export function validarExclusaoDeLivro(emprestimosRegistrados: number): void {
+  if (emprestimosRegistrados > 0) {
+    throw erros.livroComEmprestimos(emprestimosRegistrados)
+  }
+}
+
+/** Mesma ideia da exclusão de livro: usuário com histórico não é apagado. */
+export function validarExclusaoDeUsuario(emprestimosRegistrados: number): void {
+  if (emprestimosRegistrados > 0) {
+    throw erros.usuarioComEmprestimos(emprestimosRegistrados)
+  }
+}
+
 /**
  * Valida as três regras de empréstimo na ordem em que fazem sentido para o
  * usuário: primeiro "tem livro?", depois "você está em atraso?", depois

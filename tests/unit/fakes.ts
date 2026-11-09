@@ -14,7 +14,7 @@ import type {
   LivroRepositorio,
   UsuarioRepositorio,
 } from '../../src/domain/repositorios'
-import type { EstadoParaEmprestar } from '../../src/domain/regras'
+import type { EstadoParaEmprestar, EstadoParaAtualizarLivro } from '../../src/domain/regras'
 import { calcularDisponiveis, inicioDoDia } from '../../src/domain/regras'
 import { erros } from '../../src/domain/erros'
 
@@ -52,6 +52,10 @@ export function criarUsuarioFake(dados: Partial<Usuario> = {}): Usuario {
 export class LivroRepositorioFake implements LivroRepositorio {
   readonly livros: Livro[] = []
 
+  /** Números usados pelos testes de edição/exclusão. */
+  emprestimosAtivos = 0
+  emprestimosRegistrados = 0
+
   async criar(dados: DadosNovoLivro): Promise<Livro> {
     const livro: Livro = { id: randomUUID(), criadoEm: new Date(), ...dados }
     this.livros.push(livro)
@@ -69,10 +73,41 @@ export class LivroRepositorioFake implements LivroRepositorio {
       exemplaresDisponiveis: calcularDisponiveis(livro.exemplaresTotal, 0),
     }))
   }
+
+  async atualizarComBloqueio(
+    id: string,
+    dados: DadosNovoLivro,
+    validar: (estado: EstadoParaAtualizarLivro) => void,
+  ): Promise<Livro> {
+    const livro = await this.buscarPorId(id)
+    if (!livro) throw erros.livroNaoEncontrado()
+
+    validar({
+      exemplaresTotal: dados.exemplaresTotal,
+      emprestimosAtivos: this.emprestimosAtivos,
+    })
+
+    Object.assign(livro, dados)
+    return livro
+  }
+
+  async excluirComBloqueio(
+    id: string,
+    validar: (emprestimosRegistrados: number) => void,
+  ): Promise<void> {
+    const indice = this.livros.findIndex((livro) => livro.id === id)
+    if (indice < 0) throw erros.livroNaoEncontrado()
+
+    validar(this.emprestimosRegistrados)
+    this.livros.splice(indice, 1)
+  }
 }
 
 export class UsuarioRepositorioFake implements UsuarioRepositorio {
   readonly usuarios: Usuario[] = []
+
+  /** Quantidade usada pelo teste de exclusão de usuário. */
+  emprestimosRegistrados = 0
 
   async criar(dados: DadosNovoUsuario): Promise<Usuario> {
     const usuario: Usuario = { id: randomUUID(), criadoEm: new Date(), ...dados }
@@ -86,6 +121,25 @@ export class UsuarioRepositorioFake implements UsuarioRepositorio {
 
   async listar(): Promise<Usuario[]> {
     return [...this.usuarios].sort((a, b) => a.nome.localeCompare(b.nome))
+  }
+
+  async atualizar(id: string, dados: DadosNovoUsuario): Promise<Usuario> {
+    const usuario = await this.buscarPorId(id)
+    if (!usuario) throw erros.usuarioNaoEncontrado()
+
+    Object.assign(usuario, dados)
+    return usuario
+  }
+
+  async excluirComBloqueio(
+    id: string,
+    validar: (emprestimosRegistrados: number) => void,
+  ): Promise<void> {
+    const indice = this.usuarios.findIndex((usuario) => usuario.id === id)
+    if (indice < 0) throw erros.usuarioNaoEncontrado()
+
+    validar(this.emprestimosRegistrados)
+    this.usuarios.splice(indice, 1)
   }
 }
 

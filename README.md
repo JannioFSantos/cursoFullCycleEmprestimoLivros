@@ -15,6 +15,7 @@ camadas, testes, CI, logs, métricas e teste de carga.
 ## O que a API faz
 
 - cadastra livro e usuário;
+- edita e exclui livro e usuário (sem apagar histórico de empréstimos);
 - lista livros, usuários e empréstimos (com o nome de quem pegou);
 - empresta um livro por 14 dias;
 - não deixa emprestar se não tem exemplar disponível;
@@ -192,8 +193,8 @@ um livro ali, ele fica no banco de verdade.
 ## Testes
 
 ```bash
-npm run test:unit          # 24 testes, sem banco, roda em ~1s
-npm run test:integration   # 12 testes, com banco real
+npm run test:unit          # 34 testes, sem banco, roda em ~1s
+npm run test:integration   # 18 testes, com banco real
 npm run test:coverage      # tudo + cobertura
 ```
 
@@ -204,6 +205,9 @@ O que os testes cobrem:
 - as três regras de recusa: sem exemplar, atraso e limite de 3;
 - livro, usuário ou empréstimo que não existe (404);
 - devolver o mesmo empréstimo duas vezes (409);
+- editar livro e usuário, inclusive 404 para id inexistente;
+- bloquear redução de exemplares abaixo dos empréstimos ativos;
+- bloquear exclusão de livro/usuário que já tem empréstimo;
 - a tela de demonstração e a documentação Swagger respondendo;
 - as listas que alimentam a tela (`GET /API/usuarios` e `GET /API/emprestimos`);
 - o fluxo completo passando por HTTP e banco de verdade.
@@ -214,10 +218,10 @@ quebra se cair abaixo.
 
 | Métrica | Mínimo | Resultado |
 | --- | --- | --- |
-| Statements | 90% | 98,27% |
+| Statements | 90% | 98,71% |
 | Branches | 85% | 100% |
-| Functions | 90% | 95,23% |
-| Lines | 90% | 98,03% |
+| Functions | 90% | 97,14% |
+| Lines | 90% | 98,57% |
 
 ## Como o código está organizado
 
@@ -249,7 +253,7 @@ As regras de negócio ficam em `src/domain`, e o acesso ao banco fica em
 `src/infra`. No meio deles existe uma interface
 (`src/domain/repositorios.ts`).
 
-Fiz isso para conseguir testar as regras sem subir banco. Os 24 testes
+Fiz isso para conseguir testar as regras sem subir banco. Os 34 testes
 unitários rodam em memória, com repositórios falsos.
 
 ### 2. Usei transação para o último exemplar
@@ -294,8 +298,9 @@ Todos os erros têm o mesmo formato:
 
 Códigos usados: `LIVRO_NAO_ENCONTRADO`, `USUARIO_NAO_ENCONTRADO`,
 `EMPRESTIMO_NAO_ENCONTRADO`, `LIVRO_INDISPONIVEL`, `USUARIO_COM_ATRASO`,
-`LIMITE_ATINGIDO`, `EMPRESTIMO_JA_DEVOLVIDO`, `VALOR_JA_CADASTRADO` e
-`DADOS_INVALIDOS`.
+`LIMITE_ATINGIDO`, `EMPRESTIMO_JA_DEVOLVIDO`, `VALOR_JA_CADASTRADO`,
+`EXEMPLARES_ABAIXO_DOS_EMPRESTIMOS`, `LIVRO_COM_EMPRESTIMOS`,
+`USUARIO_COM_EMPRESTIMOS` e `DADOS_INVALIDOS`.
 
 ## Logs e métricas
 

@@ -116,6 +116,54 @@ paths:
         '409':
           $ref: '#/components/responses/Conflito'
 
+  /livros/{id}:
+    put:
+      tags: [Livros]
+      operationId: atualizarLivro
+      summary: Edita um livro
+      description: |
+        Substitui os dados do livro. O ISBN continua único.
+
+        Não deixa reduzir `exemplaresTotal` abaixo do número de empréstimos
+        ativos. Nesse caso responde 409 `EXEMPLARES_ABAIXO_DOS_EMPRESTIMOS`.
+      parameters:
+        - $ref: '#/components/parameters/IdDoRecurso'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovoLivro'
+      responses:
+        '200':
+          description: Livro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Livro'
+        '400':
+          $ref: '#/components/responses/DadosInvalidos'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+    delete:
+      tags: [Livros]
+      operationId: excluirLivro
+      summary: Exclui um livro
+      description: |
+        Só exclui livro que nunca teve empréstimo. Livro com histórico responde
+        409 `LIVRO_COM_EMPRESTIMOS`, para não apagar quem pegou o livro.
+      parameters:
+        - $ref: '#/components/parameters/IdDoRecurso'
+      responses:
+        '204':
+          description: Livro excluído
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+
   /usuarios:
     get:
       tags: [Usuários]
@@ -175,6 +223,48 @@ paths:
                 $ref: '#/components/schemas/Usuario'
         '404':
           $ref: '#/components/responses/NaoEncontrado'
+    put:
+      tags: [Usuários]
+      operationId: atualizarUsuario
+      summary: Edita um usuário
+      description: Substitui nome e e-mail. O e-mail continua único.
+      parameters:
+        - $ref: '#/components/parameters/IdDoRecurso'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovoUsuario'
+      responses:
+        '200':
+          description: Usuário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/DadosInvalidos'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+    delete:
+      tags: [Usuários]
+      operationId: excluirUsuario
+      summary: Exclui um usuário
+      description: |
+        Só exclui usuário que nunca pegou livro. Usuário com histórico responde
+        409 `USUARIO_COM_EMPRESTIMOS`, para não apagar o histórico.
+      parameters:
+        - $ref: '#/components/parameters/IdDoRecurso'
+      responses:
+        '204':
+          description: Usuário excluído
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
 
   /emprestimos:
     get:

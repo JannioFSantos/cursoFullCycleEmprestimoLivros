@@ -299,4 +299,163 @@ describe('API de empréstimos (integração)', () => {
       erro: { codigo: 'VALOR_JA_CADASTRADO' },
     })
   })
+
+  it('edita um livro com PUT', async () => {
+    const livro = await criarLivro(2)
+
+    const resposta = await app.inject({
+      method: 'PUT',
+      url: `/API/livros/${livro.id}`,
+      payload: {
+        titulo: 'Livro editado',
+        autor: 'Autor editado',
+        isbn: '9780000007777',
+        exemplaresTotal: 4,
+      },
+    })
+
+    expect(resposta.statusCode).toBe(200)
+    expect(resposta.json()).toMatchObject({
+      id: livro.id,
+      titulo: 'Livro editado',
+      autor: 'Autor editado',
+      isbn: '9780000007777',
+      exemplaresTotal: 4,
+    })
+  })
+
+  it('recusa reduzir exemplares abaixo dos empréstimos ativos', async () => {
+    const livro = await criarLivro(2)
+    const primeiro = await criarUsuario()
+    const segundo = await criarUsuario()
+
+    expect((await emprestar(livro.id, primeiro.id)).statusCode).toBe(201)
+    expect((await emprestar(livro.id, segundo.id)).statusCode).toBe(201)
+
+    const resposta = await app.inject({
+      method: 'PUT',
+      url: `/API/livros/${livro.id}`,
+      payload: {
+        titulo: livro.titulo,
+        autor: 'Autor de teste',
+        isbn: '9780000008888',
+        exemplaresTotal: 1,
+      },
+    })
+
+    expect(resposta.statusCode).toBe(409)
+    expect(resposta.json()).toMatchObject({
+      erro: { codigo: 'EXEMPLARES_ABAIXO_DOS_EMPRESTIMOS' },
+    })
+  })
+
+  it('exclui livro sem empréstimos e recusa livro com histórico', async () => {
+    const semEmprestimo = await criarLivro(1)
+
+    const excluido = await app.inject({
+      method: 'DELETE',
+      url: `/API/livros/${semEmprestimo.id}`,
+    })
+    expect(excluido.statusCode).toBe(204)
+
+    const lista = await app.inject({ method: 'GET', url: '/API/livros' })
+    expect(lista.json().itens.map((item: { id: string }) => item.id)).not.toContain(
+      semEmprestimo.id,
+    )
+
+    const comEmprestimo = await criarLivro(1)
+    const usuario = await criarUsuario()
+    await emprestar(comEmprestimo.id, usuario.id)
+
+    const recusado = await app.inject({
+      method: 'DELETE',
+      url: `/API/livros/${comEmprestimo.id}`,
+    })
+
+    expect(recusado.statusCode).toBe(409)
+    expect(recusado.json()).toMatchObject({
+      erro: { codigo: 'LIVRO_COM_EMPRESTIMOS' },
+    })
+  })
+
+  it('edita um usuário com PUT', async () => {
+    const usuario = await criarUsuario()
+
+    const resposta = await app.inject({
+      method: 'PUT',
+      url: `/API/usuarios/${usuario.id}`,
+      payload: { nome: 'Nome editado', email: 'editado@exemplo.com' },
+    })
+
+    expect(resposta.statusCode).toBe(200)
+    expect(resposta.json()).toMatchObject({
+      id: usuario.id,
+      nome: 'Nome editado',
+      email: 'editado@exemplo.com',
+    })
+  })
+
+  it('exclui usuário sem empréstimos e recusa usuário com histórico', async () => {
+    const semEmprestimo = await criarUsuario()
+
+    const excluido = await app.inject({
+      method: 'DELETE',
+      url: `/API/usuarios/${semEmprestimo.id}`,
+    })
+    expect(excluido.statusCode).toBe(204)
+
+    const lista = await app.inject({ method: 'GET', url: '/API/usuarios' })
+    expect(lista.json().itens.map((item: { id: string }) => item.id)).not.toContain(
+      semEmprestimo.id,
+    )
+
+    const livro = await criarLivro(1)
+    const comEmprestimo = await criarUsuario()
+    await emprestar(livro.id, comEmprestimo.id)
+
+    const recusado = await app.inject({
+      method: 'DELETE',
+      url: `/API/usuarios/${comEmprestimo.id}`,
+    })
+
+    expect(recusado.statusCode).toBe(409)
+    expect(recusado.json()).toMatchObject({
+      erro: { codigo: 'USUARIO_COM_EMPRESTIMOS' },
+    })
+  })
+
+  it('retorna 404 ao editar ou excluir recurso inexistente', async () => {
+    const idInexistente = '00000000-0000-4000-8000-000000000000'
+
+    const editarLivro = await app.inject({
+      method: 'PUT',
+      url: `/API/livros/${idInexistente}`,
+      payload: {
+        titulo: 'Livro',
+        autor: 'Autor',
+        isbn: '9780000006666',
+        exemplaresTotal: 1,
+      },
+    })
+    expect(editarLivro.statusCode).toBe(404)
+
+    const excluirLivro = await app.inject({
+      method: 'DELETE',
+      url: `/API/livros/${idInexistente}`,
+    })
+    expect(excluirLivro.statusCode).toBe(404)
+
+    const editarUsuario = await app.inject({
+      method: 'PUT',
+      url: `/API/usuarios/${idInexistente}`,
+      payload: { nome: 'Nome', email: 'nome@exemplo.com' },
+    })
+    expect(editarUsuario.statusCode).toBe(404)
+
+    const excluirUsuario = await app.inject({
+      method: 'DELETE',
+      url: `/API/usuarios/${idInexistente}`,
+    })
+    expect(excluirUsuario.statusCode).toBe(404)
+  })
 })

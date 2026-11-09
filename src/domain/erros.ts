@@ -72,4 +72,28 @@ export const erros = {
       `Já existe um registro com este ${campo}.`,
       409,
     ),
+
+  exemplaresAbaixoDosEmprestimos: (
+    exemplaresTotal: number,
+    emprestimosAtivos: number,
+  ) =>
+    new ErroDeDominio(
+      'EXEMPLARES_ABAIXO_DOS_EMPRESTIMOS',
+      `O livro tem ${emprestimosAtivos} empréstimo(s) ativo(s); não é possível reduzir para ${exemplaresTotal} exemplar(es).`,
+      409,
+    ),
+
+  livroComEmprestimos: (quantidade: number) =>
+    new ErroDeDominio(
+      'LIVRO_COM_EMPRESTIMOS',
+      `Este livro tem ${quantidade} empréstimo(s) registrado(s) e não pode ser excluído.`,
+      409,
+    ),
+
+  usuarioComEmprestimos: (quantidade: number) =>
+    new ErroDeDominio(
+      'USUARIO_COM_EMPRESTIMOS',
+      `Este usuário tem ${quantidade} empréstimo(s) registrado(s) e não pode ser excluído.`,
+      409,
+    ),
 }

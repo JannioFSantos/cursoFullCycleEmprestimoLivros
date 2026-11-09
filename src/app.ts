@@ -23,6 +23,10 @@ import { PrismaEmprestimoRepositorio } from './infra/repositories/prisma-emprest
 
 import { EmprestarLivro } from './use-cases/emprestar-livro'
 import { DevolverEmprestimo } from './use-cases/devolver-emprestimo'
+import { AtualizarLivro } from './use-cases/atualizar-livro'
+import { ExcluirLivro } from './use-cases/excluir-livro'
+import { AtualizarUsuario } from './use-cases/atualizar-usuario'
+import { ExcluirUsuario } from './use-cases/excluir-usuario'
 
 import { criarMetricas, criarRegistroDeMetricas } from './observability/metricas'
 import { registrarTratamentoDeErros } from './http/erro-handler'
@@ -199,8 +203,13 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
       'GET /API/docs',
       'POST /API/livros',
       'GET /API/livros',
+      'PUT /API/livros/:id',
+      'DELETE /API/livros/:id',
       'POST /API/usuarios',
       'GET /API/usuarios',
+      'GET /API/usuarios/:id',
+      'PUT /API/usuarios/:id',
+      'DELETE /API/usuarios/:id',
       'POST /API/emprestimos',
       'GET /API/emprestimos',
       'PATCH /API/emprestimos/:id/devolucao',
@@ -223,6 +232,12 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
   )
   const devolverEmprestimo = new DevolverEmprestimo(emprestimos, relogio)
 
+  // Casos de uso de manutenção dos cadastros (editar/excluir).
+  const atualizarLivro = new AtualizarLivro(livros)
+  const excluirLivro = new ExcluirLivro(livros)
+  const atualizarUsuario = new AtualizarUsuario(usuarios)
+  const excluirUsuario = new ExcluirUsuario(usuarios)
+
   // O tratamento de erro precisa ser registrado ANTES das rotas para que as
   // rotas dentro de /API herdem o mesmo formato de resposta.
   registrarTratamentoDeErros(app)
@@ -234,8 +249,12 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
   app.register(
     async (api) => {
       registrarInfraestrutura(api)
-      registrarRotasDeLivros(api, livros)
-      registrarRotasDeUsuarios(api, usuarios)
+      registrarRotasDeLivros(api, { livros, atualizarLivro, excluirLivro })
+      registrarRotasDeUsuarios(api, {
+        usuarios,
+        atualizarUsuario,
+        excluirUsuario,
+      })
       registrarRotasDeEmprestimos(api, {
         emprestarLivro,
         devolverEmprestimo,

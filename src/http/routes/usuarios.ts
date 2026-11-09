@@ -1,14 +1,32 @@
 import type { FastifyInstance } from 'fastify'
 import type { UsuarioRepositorio } from '../../domain/repositorios'
+import type { AtualizarUsuario } from '../../use-cases/atualizar-usuario'
+import type { ExcluirUsuario } from '../../use-cases/excluir-usuario'
 import { erros } from '../../domain/erros'
 import { esquemaNovoUsuario, esquemaParametroId } from '../esquemas'
 import { validar } from '../validacao'
 
-/** Rotas de usuários: cadastro e busca por id. */
+export interface DependenciasDasRotasDeUsuarios {
+  usuarios: UsuarioRepositorio
+  atualizarUsuario: AtualizarUsuario
+  excluirUsuario: ExcluirUsuario
+}
+
+/**
+ * Rotas de usuários.
+ *
+ * POST /usuarios       -> cadastra (201)
+ * GET  /usuarios       -> lista (200)
+ * GET  /usuarios/:id   -> busca por id (200 ou 404)
+ * PUT  /usuarios/:id   -> edita nome e e-mail (200)
+ * DELETE /usuarios/:id -> exclui (204)
+ */
 export function registrarRotasDeUsuarios(
   app: FastifyInstance,
-  usuarios: UsuarioRepositorio,
+  dependencias: DependenciasDasRotasDeUsuarios,
 ): void {
+  const { usuarios, atualizarUsuario, excluirUsuario } = dependencias
+
   app.post('/usuarios', async (requisicao, resposta) => {
     const dados = validar(esquemaNovoUsuario, requisicao.body)
     const usuario = await usuarios.criar(dados)
@@ -28,5 +46,18 @@ export function registrarRotasDeUsuarios(
     if (!usuario) throw erros.usuarioNaoEncontrado()
 
     return usuario
+  })
+
+  app.put('/usuarios/:id', async (requisicao, resposta) => {
+    const { id } = validar(esquemaParametroId, requisicao.params)
+    const dados = validar(esquemaNovoUsuario, requisicao.body)
+    const usuario = await atualizarUsuario.executar(id, dados)
+    return resposta.status(200).send(usuario)
+  })
+
+  app.delete('/usuarios/:id', async (requisicao, resposta) => {
+    const { id } = validar(esquemaParametroId, requisicao.params)
+    await excluirUsuario.executar(id)
+    return resposta.status(204).send()
   })
 }
