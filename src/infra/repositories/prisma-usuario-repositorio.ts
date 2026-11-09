@@ -13,4 +13,8 @@ export class PrismaUsuarioRepositorio implements UsuarioRepositorio {
   async buscarPorId(id: string): Promise<Usuario | null> {
     return this.prisma.usuario.findUnique({ where: { id } })
   }
+
+  async listar(): Promise<Usuario[]> {
+    return this.prisma.usuario.findMany({ orderBy: { nome: 'asc' } })
+  }
 }

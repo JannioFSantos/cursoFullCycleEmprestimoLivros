@@ -15,6 +15,11 @@ export function registrarRotasDeUsuarios(
     return resposta.status(201).send(usuario)
   })
 
+  // Lista usada pela tela de demonstração (select de usuário e tabela).
+  app.get('/usuarios', async () => {
+    return { itens: await usuarios.listar() }
+  })
+
   app.get('/usuarios/:id', async (requisicao) => {
     const { id } = validar(esquemaParametroId, requisicao.params)
     const usuario = await usuarios.buscarPorId(id)

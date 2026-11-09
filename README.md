@@ -15,6 +15,7 @@ camadas, testes, CI, logs, métricas e teste de carga.
 ## O que a API faz
 
 - cadastra livro e usuário;
+- lista livros, usuários e empréstimos (com o nome de quem pegou);
 - empresta um livro por 14 dias;
 - não deixa emprestar se não tem exemplar disponível;
 - não deixa emprestar se o usuário está com livro atrasado;
@@ -26,6 +27,9 @@ A parte mais importante é a regra do exemplar. Se duas pessoas tentarem pegar
 o último exemplar ao mesmo tempo, uma recebe `201` e a outra recebe `409`. Para
 isso usei uma transação no banco com `SELECT ... FOR UPDATE`.
 
+Além da API, fiz uma tela simples de demonstração. Ela abre na raiz do site e
+usa a própria API para mostrar cadastros, empréstimos, devoluções e atrasados.
+
 ## Tecnologias que usei
 
 - **Node.js 22 + TypeScript** — linguagem do curso, com tipos;
@@ -36,7 +40,7 @@ isso usei uma transação no banco com `SELECT ... FOR UPDATE`.
 - **Vitest** — testes;
 - **pino** — logs (já vem dentro do Fastify);
 - **prom-client** — métricas para o Prometheus;
-- **Swagger** — documentação interativa em `/docs`;
+- **Swagger** — documentação interativa em `/API/docs`;
 - **k6** — teste de carga;
 - **Docker Compose** — subir tudo com um comando.
 
@@ -65,6 +69,9 @@ Resposta esperada:
 ```json
 { "status": "ok", "uptimeSegundos": 5 }
 ```
+
+Agora abra `http://localhost:3000` no navegador. Essa é a tela de
+demonstração. A API em si fica em `http://localhost:3000/API`.
 
 Quando o container da API inicia, ele roda as migrations do banco sozinho
 (`prisma migrate deploy`). Não precisa rodar nada à mão.
@@ -120,25 +127,25 @@ npm run dev
 
 ```bash
 # 1. cadastrar um livro com 1 exemplar
-curl -s -X POST http://localhost:3000/livros \
+curl -s -X POST http://localhost:3000/API/livros \
   -H 'Content-Type: application/json' \
   -d '{"titulo":"Domain-Driven Design","autor":"Eric Evans","isbn":"9780321125217","exemplaresTotal":1}'
 
 # 2. cadastrar um usuário
-curl -s -X POST http://localhost:3000/usuarios \
+curl -s -X POST http://localhost:3000/API/usuarios \
   -H 'Content-Type: application/json' \
   -d '{"nome":"Ana","email":"ana@exemplo.com"}'
 
 # 3. emprestar (201)
-curl -s -X POST http://localhost:3000/emprestimos \
+curl -s -X POST http://localhost:3000/API/emprestimos \
   -H 'Content-Type: application/json' \
   -d '{"livroId":"<ID_DO_LIVRO>","usuarioId":"<ID_DO_USUARIO>"}'
 
 # 4. devolver
-curl -s -X PATCH http://localhost:3000/emprestimos/<ID_DO_EMPRESTIMO>/devolucao
+curl -s -X PATCH http://localhost:3000/API/emprestimos/<ID_DO_EMPRESTIMO>/devolucao
 
 # 5. ver os atrasados
-curl -s http://localhost:3000/emprestimos/atrasados
+curl -s http://localhost:3000/API/emprestimos/atrasados
 ```
 
 Para testar a regra do último exemplar, cadastre um segundo usuário e tente
@@ -151,7 +158,7 @@ A própria API publica a documentação dela. Com a API rodando, abra no
 navegador:
 
 ```
-http://localhost:3000/docs
+http://localhost:3000/API/docs
 ```
 
 Nessa tela dá para ver todas as rotas, os dados que cada uma recebe, as
@@ -159,16 +166,34 @@ respostas e até testar direto pelo botão **Try it out**.
 
 O contrato fica no arquivo `docs/openapi.yaml`. É o mesmo arquivo que o
 Swagger mostra e que o CI valida com o Spectral. Se quiser o contrato em JSON,
-basta acessar `/docs/json`.
+basta acessar `/API/docs/json`.
 
 Em produção fica no mesmo endereço da API:
-`https://agendadeconsultas.v6.rocks/docs`.
+`https://agendadeconsultas.v6.rocks/API/docs`.
+
+## Tela de demonstração
+
+A tela fica em `https://agendadeconsultas.v6.rocks/` e não tem framework nem
+build. É um único arquivo HTML (`public/index.html`) com CSS e JavaScript
+simples, servido pela própria API.
+
+Ela tem abas, como se fossem páginas separadas:
+
+- **Visão geral** — números do dia e os últimos empréstimos;
+- **Livros** — cadastro e catálogo com exemplares disponíveis;
+- **Usuários** — cadastro e lista de leitores;
+- **Empréstimos** — novo empréstimo, lista de quem pegou qual livro e botão
+  de devolver;
+- **Atrasados** — quem passou do prazo e quantos dias.
+
+Tudo o que aparece na tela vem de chamadas reais para `/API`. Se você cadastrar
+um livro ali, ele fica no banco de verdade.
 
 ## Testes
 
 ```bash
 npm run test:unit          # 24 testes, sem banco, roda em ~1s
-npm run test:integration   # 10 testes, com banco real
+npm run test:integration   # 12 testes, com banco real
 npm run test:coverage      # tudo + cobertura
 ```
 
@@ -179,7 +204,8 @@ O que os testes cobrem:
 - as três regras de recusa: sem exemplar, atraso e limite de 3;
 - livro, usuário ou empréstimo que não existe (404);
 - devolver o mesmo empréstimo duas vezes (409);
-- a documentação Swagger respondendo em `/docs`;
+- a tela de demonstração e a documentação Swagger respondendo;
+- as listas que alimentam a tela (`GET /API/usuarios` e `GET /API/emprestimos`);
 - o fluxo completo passando por HTTP e banco de verdade.
 
 A cobertura é medida só em `src/domain` e `src/use-cases`, que é onde ficam as
@@ -211,6 +237,7 @@ flowchart LR
 | `src/infra` | implementação dos repositórios com Prisma |
 | `src/http` | rotas, validação com Zod e tratamento de erro |
 | `src/observability` | métricas do Prometheus |
+| `public` | tela de demonstração (HTML único) |
 | `tests/unit` | testes sem banco |
 | `tests/integration` | testes com banco real |
 
@@ -279,7 +306,7 @@ status e tempo:
 {
   "requisicaoId": "0d6e2a3f-...",
   "metodo": "POST",
-  "rota": "/emprestimos",
+  "rota": "/API/emprestimos",
   "status": 201,
   "duracaoMs": 12.4,
   "msg": "requisicao_concluida"
@@ -306,7 +333,7 @@ Resultado medido na minha máquina com Docker (os detalhes estão em
 
 | Teste | Resultado |
 | --- | --- |
-| Smoke (`k6/smoke.js`) | 5/5 checks, p95 de 58,83 ms |
+| Smoke (`k6/smoke.js`) | 5/5 checks, p95 de 40,18 ms |
 | Carga (`k6/load.js`) | ~687 req/s |
 | Leitura `GET /livros` | p95 de 41,28 ms |
 | Escrita `POST /emprestimos` | p95 de 264,48 ms |
@@ -326,8 +353,10 @@ O passo a passo completo está em
 5. exponha a porta `3000` e aponte o domínio
    `agendadeconsultas.v6.rocks` com HTTPS.
 
-Em produção, a API fica em `https://agendadeconsultas.v6.rocks` e o Swagger em
-`https://agendadeconsultas.v6.rocks/docs`.
+Em produção, a tela de demonstração fica em
+`https://agendadeconsultas.v6.rocks`, a API em
+`https://agendadeconsultas.v6.rocks/API` e o Swagger em
+`https://agendadeconsultas.v6.rocks/API/docs`.
 
 Variáveis necessárias:
 
@@ -349,10 +378,13 @@ exemplo.
 Não fiz de propósito, para não perder o prazo:
 
 - login e senha (autenticação);
-- frontend;
 - cache e fila;
 - paginação;
 - deploy com mais de uma instância.
+
+A tela de demonstração é só para mostrar a API funcionando. Ela não tem login,
+não foi feita para celular com muito carinho e não substitui um frontend de
+verdade.
 
 Se eu tivesse mais tempo, começaria por cache no `GET /livros` e um teste de
 carga com livros diferentes.

@@ -12,6 +12,9 @@ import { prisma } from '../../src/infra/prisma/client'
  * Usamos `app.inject()` em vez de abrir uma porta: é o mesmo caminho de uma
  * requisição real, só que sem rede. É o equivalente ao Supertest no Fastify.
  *
+ * Repare que todas as rotas de negócio começam com /API. É o mesmo prefixo
+ * que a produção usa (https://agendadeconsultas.v6.rocks/API).
+ *
  * Pré-requisito: `docker compose up -d db` e `npm run db:deploy`.
  * ATENÇÃO: este teste LIMPA as tabelas antes de cada caso. Nunca rode contra
  * um banco com dados que você queira manter.
@@ -60,7 +63,7 @@ afterAll(async () => {
 async function criarLivro(exemplaresTotal: number): Promise<{ id: string; titulo: string }> {
   const resposta = await app.inject({
     method: 'POST',
-    url: '/livros',
+    url: '/API/livros',
     payload: {
       titulo: `Livro ${sequencia}`,
       autor: 'Autor de teste',
@@ -73,11 +76,11 @@ async function criarLivro(exemplaresTotal: number): Promise<{ id: string; titulo
   return resposta.json()
 }
 
-async function criarUsuario(): Promise<{ id: string }> {
+async function criarUsuario(): Promise<{ id: string; nome: string }> {
   sequencia += 1
   const resposta = await app.inject({
     method: 'POST',
-    url: '/usuarios',
+    url: '/API/usuarios',
     payload: {
       nome: `Usuário ${sequencia}`,
       email: `usuario-${sequencia}@exemplo.com`,
@@ -91,30 +94,48 @@ async function criarUsuario(): Promise<{ id: string }> {
 async function emprestar(livroId: string, usuarioId: string) {
   return app.inject({
     method: 'POST',
-    url: '/emprestimos',
+    url: '/API/emprestimos',
     payload: { livroId, usuarioId },
   })
 }
 
 describe('API de empréstimos (integração)', () => {
-  it('responde 200 no healthcheck quando o banco está acessível', async () => {
-    const resposta = await app.inject({ method: 'GET', url: '/health' })
+  it('serve a tela de demonstração na raiz', async () => {
+    const resposta = await app.inject({ method: 'GET', url: '/' })
 
     expect(resposta.statusCode).toBe(200)
-    expect(resposta.json()).toMatchObject({ status: 'ok' })
+    expect(resposta.headers['content-type']).toContain('text/html')
+    expect(resposta.body).toContain('Biblioteca')
+    expect(resposta.body).toContain('/API')
   })
 
-  it('publica a documentação Swagger em /docs', async () => {
-    const pagina = await app.inject({ method: 'GET', url: '/docs/' })
+  it('responde 200 no healthcheck quando o banco está acessível', async () => {
+    // O healthcheck fica na raiz porque é o endereço que o Coolify usa.
+    const raiz = await app.inject({ method: 'GET', url: '/health' })
+    expect(raiz.statusCode).toBe(200)
+    expect(raiz.json()).toMatchObject({ status: 'ok' })
+
+    // E também dentro de /API, junto do resto do contrato.
+    const dentroDaApi = await app.inject({ method: 'GET', url: '/API/health' })
+    expect(dentroDaApi.statusCode).toBe(200)
+  })
+
+  it('publica a documentação Swagger em /API/docs', async () => {
+    const pagina = await app.inject({ method: 'GET', url: '/API/docs/' })
 
     expect(pagina.statusCode).toBe(200)
     expect(pagina.body.toLowerCase()).toContain('swagger')
 
-    // /docs/json é o mesmo contrato, em JSON, que o Swagger UI carrega.
-    const contrato = await app.inject({ method: 'GET', url: '/docs/json' })
+    // /API/docs/json é o mesmo contrato, em JSON, que o Swagger UI carrega.
+    const contrato = await app.inject({ method: 'GET', url: '/API/docs/json' })
 
     expect(contrato.statusCode).toBe(200)
     expect(contrato.json()).toMatchObject({ openapi: '3.1.0' })
+
+    // Quem digitava /docs continua chegando na documentação nova.
+    const antigo = await app.inject({ method: 'GET', url: '/docs' })
+    expect(antigo.statusCode).toBe(302)
+    expect(antigo.headers.location).toBe('/API/docs')
   })
 
   it('empresta um livro e calcula a data prevista', async () => {
@@ -129,6 +150,29 @@ describe('API de empréstimos (integração)', () => {
       usuarioId: usuario.id,
       status: 'ATIVO',
       dataPrevista: '2026-01-19T00:00:00.000Z',
+    })
+  })
+
+  it('lista usuários e empréstimos detalhados para a tela', async () => {
+    const livro = await criarLivro(1)
+    const usuario = await criarUsuario()
+    await emprestar(livro.id, usuario.id)
+
+    const usuarios = await app.inject({ method: 'GET', url: '/API/usuarios' })
+    expect(usuarios.statusCode).toBe(200)
+    expect(usuarios.json().itens).toHaveLength(1)
+    expect(usuarios.json().itens[0]).toMatchObject({
+      id: usuario.id,
+      nome: usuario.nome,
+    })
+
+    const emprestimos = await app.inject({ method: 'GET', url: '/API/emprestimos' })
+    expect(emprestimos.statusCode).toBe(200)
+    expect(emprestimos.json().itens).toHaveLength(1)
+    expect(emprestimos.json().itens[0]).toMatchObject({
+      status: 'ATIVO',
+      livro: { id: livro.id },
+      usuario: { id: usuario.id, nome: usuario.nome },
     })
   })
 
@@ -156,7 +200,7 @@ describe('API de empréstimos (integração)', () => {
 
     const devolucao = await app.inject({
       method: 'PATCH',
-      url: `/emprestimos/${emprestimoId}/devolucao`,
+      url: `/API/emprestimos/${emprestimoId}/devolucao`,
     })
 
     expect(devolucao.statusCode).toBe(200)
@@ -184,7 +228,7 @@ describe('API de empréstimos (integração)', () => {
 
     const atrasados = await app.inject({
       method: 'GET',
-      url: '/emprestimos/atrasados',
+      url: '/API/emprestimos/atrasados',
     })
 
     expect(atrasados.statusCode).toBe(200)
@@ -227,7 +271,7 @@ describe('API de empréstimos (integração)', () => {
   it('retorna 400 com detalhes quando o corpo é inválido', async () => {
     const resposta = await app.inject({
       method: 'POST',
-      url: '/emprestimos',
+      url: '/API/emprestimos',
       payload: { livroId: 'nao-e-uuid', usuarioId: 'tambem-nao' },
     })
 
@@ -244,11 +288,11 @@ describe('API de empréstimos (integração)', () => {
       exemplaresTotal: 1,
     }
 
-    const primeiro = await app.inject({ method: 'POST', url: '/livros', payload })
+    const primeiro = await app.inject({ method: 'POST', url: '/API/livros', payload })
     expect(primeiro.statusCode).toBe(201)
 
     // O Prisma devolve P2002 e o error handler traduz para 409 padronizado.
-    const repetido = await app.inject({ method: 'POST', url: '/livros', payload })
+    const repetido = await app.inject({ method: 'POST', url: '/API/livros', payload })
 
     expect(repetido.statusCode).toBe(409)
     expect(repetido.json()).toMatchObject({

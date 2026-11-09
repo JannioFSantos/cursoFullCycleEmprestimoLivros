@@ -13,13 +13,13 @@ import { check } from 'k6'
  *
  * Rodar:
  *   k6 run k6/load.js
- *   k6 run -e BASE_URL=https://sua-api.exemplo.com k6/load.js
+ *   k6 run -e BASE_URL=https://agendadeconsultas.v6.rocks/API k6/load.js
  *
  * Observação sobre 409: empréstimo recusado por regra de negócio NÃO é falha
  * técnica. Por isso o cenário de escrita não usa o threshold http_req_failed;
  * ele mede latência (que é o objetivo) e um check aceita 201 ou 409.
  */
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000'
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000/API'
 const CABECALHOS = { 'Content-Type': 'application/json' }
 
 const QUANTIDADE_DE_USUARIOS = 300

@@ -139,4 +139,18 @@ export class PrismaEmprestimoRepositorio implements EmprestimoRepositorio {
       },
     })
   }
+
+  /**
+   * Lista todos os empréstimos com livro e usuário juntos.
+   * A tela de demonstração usa isso para mostrar "quem pegou qual livro".
+   */
+  async listarDetalhados(): Promise<EmprestimoDetalhado[]> {
+    return this.prisma.emprestimo.findMany({
+      orderBy: { dataEmprestimo: 'desc' },
+      include: {
+        livro: { select: { id: true, titulo: true, autor: true } },
+        usuario: { select: { id: true, nome: true, email: true } },
+      },
+    })
+  }
 }

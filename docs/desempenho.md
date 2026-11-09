@@ -20,7 +20,11 @@ empresta, devolve e lista atrasados.
 | --- | --- |
 | Checks | 5 de 5 (100%) |
 | Requisições com erro | 0% |
-| p95 | 58,83 ms |
+| p95 | 40,18 ms |
+
+O primeiro número que medi foi 58,83 ms. Depois de mover a API para `/API`,
+rodei de novo e o p95 ficou em 40,18 ms. A diferença é ruído da máquina, não
+uma otimização.
 
 ## Teste de carga
 
@@ -106,11 +110,11 @@ melhorar o número. O risco de dado errado não compensa.
 docker compose up -d --build
 
 docker run --rm --network cursofullcycleemprestimolivros_default \
-  -e BASE_URL=http://api:3000 -v "${PWD}/k6:/scripts" \
+  -e BASE_URL=http://api:3000/API -v "${PWD}/k6:/scripts" \
   grafana/k6 run /scripts/smoke.js
 
 docker run --rm --network cursofullcycleemprestimolivros_default \
-  -e BASE_URL=http://api:3000 -v "${PWD}/k6:/scripts" \
+  -e BASE_URL=http://api:3000/API -v "${PWD}/k6:/scripts" \
   grafana/k6 run /scripts/load.js
 ```
 

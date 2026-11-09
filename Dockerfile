@@ -46,8 +46,10 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY --from=build /app/dist ./dist
-# O Swagger UI lê este arquivo em tempo de execução (rota /docs).
+# O Swagger UI lê este arquivo em tempo de execução (rota /API/docs).
 COPY docs ./docs
+# A tela de demonstração (/) também é lida em tempo de execução.
+COPY public ./public
 COPY scripts/entrypoint.sh ./scripts/entrypoint.sh
 RUN chmod +x ./scripts/entrypoint.sh
 

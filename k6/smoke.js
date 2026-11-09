@@ -10,10 +10,10 @@ import { check, fail } from 'k6'
  * Rodar:
  *   docker compose up -d
  *   k6 run k6/smoke.js
- *   # ou apontando para o Coolify:
- *   k6 run -e BASE_URL=https://sua-api.exemplo.com k6/smoke.js
+ *   # ou apontando para o Coolify (repare no /API no final):
+ *   k6 run -e BASE_URL=https://agendadeconsultas.v6.rocks/API k6/smoke.js
  */
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000'
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000/API'
 const CABECALHOS = { 'Content-Type': 'application/json' }
 
 export const options = {

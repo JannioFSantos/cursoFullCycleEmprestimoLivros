@@ -7,6 +7,9 @@ info:
   description: |
     API de domínio único do Projeto B do curso Full Cycle.
 
+    Todos os endpoints ficam sob o prefixo `/API`. A raiz do domínio mostra
+    uma tela de demonstração que usa esta mesma API.
+
     Fluxo principal: cadastrar livro e usuário, emprestar um exemplar,
     devolver e consultar atrasados.
 
@@ -23,11 +26,11 @@ info:
     identifier: MIT
 
 servers:
-  - url: /
+  - url: /API
     description: Mesmo servidor desta página (funciona local e em produção)
-  - url: http://localhost:3000
+  - url: http://localhost:3000/API
     description: Ambiente local (docker compose)
-  - url: https://agendadeconsultas.v6.rocks
+  - url: https://agendadeconsultas.v6.rocks/API
     description: Produção no Coolify
 
 tags:
@@ -114,6 +117,24 @@ paths:
           $ref: '#/components/responses/Conflito'
 
   /usuarios:
+    get:
+      tags: [Usuários]
+      operationId: listarUsuarios
+      summary: Lista todos os usuários
+      description: Ordenados por nome. Usado pela tela de demonstração.
+      responses:
+        '200':
+          description: Lista de usuários
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Usuario'
     post:
       tags: [Usuários]
       operationId: criarUsuario
@@ -156,6 +177,27 @@ paths:
           $ref: '#/components/responses/NaoEncontrado'
 
   /emprestimos:
+    get:
+      tags: [Empréstimos]
+      operationId: listarEmprestimos
+      summary: Lista todos os empréstimos com livro e usuário
+      description: |
+        Ordenados do mais recente para o mais antigo. Cada item traz os dados
+        do livro e do usuário, o que permite mostrar "quem pegou qual livro"
+        direto na tela de demonstração.
+      responses:
+        '200':
+          description: Lista de empréstimos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmprestimoDetalhado'
     post:
       tags: [Empréstimos]
       operationId: criarEmprestimo

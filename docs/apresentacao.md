@@ -8,7 +8,7 @@ de demonstração, 3 minutos de uma decisão e 3 minutos de números.
 Deixar aberto:
 
 - o terminal na pasta do projeto;
-- o navegador em `http://localhost:3000`;
+- o navegador em `http://localhost:3000` (tela de demonstração);
 - o arquivo `docs/desempenho.md`;
 - o GitHub Actions com o CI verde.
 
@@ -34,22 +34,23 @@ Mostrar a primeira linha do README: `Nível: Projeto B`.
 
 ## Minuto 1 a 4 — Demonstração
 
-> Antes de digitar curl, posso abrir `http://localhost:3000/docs` e mostrar a
-> documentação Swagger. Ela lista as rotas e deixa testar pelo botão
-> **Try it out**.
+> Primeiro abro `http://localhost:3000`, a tela de demonstração. Ela tem abas
+> de livros, usuários, empréstimos e atrasados, e conversa com a API de
+> verdade. Também posso abrir `http://localhost:3000/API/docs` para mostrar o
+> Swagger e testar pelo botão **Try it out**.
 
 Cadastrar livro, usuário e emprestar:
 
 ```bash
-curl -s -X POST http://localhost:3000/livros \
+curl -s -X POST http://localhost:3000/API/livros \
   -H 'Content-Type: application/json' \
   -d '{"titulo":"DDD","autor":"Eric Evans","isbn":"9780321125217","exemplaresTotal":1}'
 
-curl -s -X POST http://localhost:3000/usuarios \
+curl -s -X POST http://localhost:3000/API/usuarios \
   -H 'Content-Type: application/json' \
   -d '{"nome":"Ana","email":"ana@exemplo.com"}'
 
-curl -s -X POST http://localhost:3000/emprestimos \
+curl -s -X POST http://localhost:3000/API/emprestimos \
   -H 'Content-Type: application/json' \
   -d '{"livroId":"<ID>","usuarioId":"<ID>"}'
 ```
@@ -57,7 +58,7 @@ curl -s -X POST http://localhost:3000/emprestimos \
 Depois, com um segundo usuário, tentar o mesmo livro:
 
 ```bash
-curl -s -X POST http://localhost:3000/emprestimos \
+curl -s -X POST http://localhost:3000/API/emprestimos \
   -H 'Content-Type: application/json' \
   -d '{"livroId":"<ID>","usuarioId":"<OUTRO_ID>"}'
 ```
@@ -70,7 +71,7 @@ Mostrar o `409 LIVRO_INDISPONIVEL` e falar:
 Ainda na demo:
 
 ```bash
-curl -s -X PATCH http://localhost:3000/emprestimos/<ID>/devolucao
+curl -s -X PATCH http://localhost:3000/API/emprestimos/<ID>/devolucao
 curl -s http://localhost:3000/metrics | grep emprestimos_total
 ```
 
@@ -99,7 +100,7 @@ Se perguntarem do custo:
 
 Mostrar a tabela de `docs/desempenho.md`:
 
-- smoke: 5/5 checks, p95 de 58,83 ms;
+- smoke: 5/5 checks, p95 de 40,18 ms;
 - carga: ~687 req/s;
 - leitura p95 de 41,28 ms;
 - escrita p95 de 264,48 ms;

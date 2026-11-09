@@ -58,4 +58,9 @@ export function registrarRotasDeEmprestimos(
     // Usa o mesmo relógio injetado: em teste conseguimos "viajar no tempo".
     return { itens: await emprestimos.listarAtrasados(relogio.agora()) }
   })
+
+  // Lista completa, com livro e usuário, usada pela tela de demonstração.
+  app.get('/emprestimos', async () => {
+    return { itens: await emprestimos.listarDetalhados() }
+  })
 }

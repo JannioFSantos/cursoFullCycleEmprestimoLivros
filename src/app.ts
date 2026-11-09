@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import Fastify, {
   type FastifyInstance,
@@ -66,7 +67,7 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
   })
 
   // --------------------------- Documentação (Swagger) -----------------------
-  // Aqui a API publica o próprio contrato em /docs.
+  // Aqui a API publica o próprio contrato em /API/docs.
   //
   // O arquivo docs/openapi.yaml é a fonte da verdade: o Swagger UI só lê esse
   // arquivo e desenha a tela. Não geramos o contrato a partir das rotas para
@@ -85,7 +86,7 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
   })
 
   app.register(swaggerUi, {
-    routePrefix: '/docs',
+    routePrefix: '/API/docs',
     uiConfig: {
       docExpansion: 'list', // mostra a lista de rotas já aberta
       deepLinking: true, // cada rota tem um link próprio
@@ -99,12 +100,20 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
 
   // Rotas de infraestrutura não entram nas métricas nem nos logs de acesso:
   // o healthcheck do Coolify bate a cada 30s e poluiria tudo.
-  const rotasIgnoradas = new Set(['/health', '/metrics', '/'])
+  const rotasIgnoradas = new Set([
+    '/',
+    '/API',
+    '/health',
+    '/API/health',
+    '/metrics',
+    '/API/metrics',
+  ])
 
   app.addHook('onResponse', async (requisicao, resposta) => {
     const rota = requisicao.routeOptions.url ?? 'desconhecida'
     // A documentação carrega vários arquivos estáticos (JS, CSS, imagem).
-    // Ignoramos tudo em /docs para não poluir as métricas de negócio.
+    // Ignoramos tudo em /API/docs para não poluir as métricas de negócio.
+    if (rota.startsWith('/API/docs')) return
     if (rota.startsWith('/docs')) return
     if (rotasIgnoradas.has(rota)) return
 
@@ -133,42 +142,69 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
   })
 
   // --------------------------- Infraestrutura ------------------------------
-  app.get('/health', async (requisicao, resposta) => {
-    try {
-      // Não basta o processo estar vivo: a API só é útil se o banco responde.
-      await prisma.$queryRaw`SELECT 1`
-      return {
-        status: 'ok',
-        uptimeSegundos: Math.round(process.uptime()),
+  // Esta função registra /health e /metrics. Ela é chamada duas vezes:
+  // na raiz (para o Coolify) e dentro de /API (para ficar junto do contrato).
+  const registrarInfraestrutura = (instancia: FastifyInstance): void => {
+    instancia.get('/health', async (requisicao, resposta) => {
+      try {
+        // Não basta o processo estar vivo: a API só é útil se o banco responde.
+        await prisma.$queryRaw`SELECT 1`
+        return {
+          status: 'ok',
+          uptimeSegundos: Math.round(process.uptime()),
+        }
+      } catch (erro) {
+        requisicao.log.error({ err: erro }, 'healthcheck_banco_indisponivel')
+        return resposta.status(503).send({
+          status: 'degradado',
+          banco: 'indisponivel',
+        })
       }
-    } catch (erro) {
-      requisicao.log.error({ err: erro }, 'healthcheck_banco_indisponivel')
-      return resposta.status(503).send({
-        status: 'degradado',
-        banco: 'indisponivel',
-      })
-    }
+    })
+
+    instancia.get('/metrics', async (_requisicao, resposta) => {
+      resposta.type(registro.contentType)
+      return registro.metrics()
+    })
+  }
+
+  registrarInfraestrutura(app)
+
+  // --------------------------- Tela de demonstração ------------------------
+  // A página é um único arquivo HTML (public/index.html) com CSS e JavaScript
+  // simples. Ela chama a API em /API/* usando o mesmo domínio.
+  const paginaInicial = readFileSync(
+    path.join(__dirname, '..', 'public', 'index.html'),
+    'utf8',
+  )
+
+  app.get('/', async (_requisicao, resposta) => {
+    return resposta.type('text/html; charset=utf-8').send(paginaInicial)
   })
 
-  app.get('/metrics', async (_requisicao, resposta) => {
-    resposta.type(registro.contentType)
-    return registro.metrics()
+  // Quem já conhece /docs continua funcionando: redireciona para o novo local.
+  app.get('/docs', async (_requisicao, resposta) => {
+    return resposta.redirect('/API/docs')
   })
 
-  app.get('/', async () => ({
+  // Informações da API em JSON (útil para conferir o prefixo rapidamente).
+  app.get('/API', async () => ({
     nome: 'API de Empréstimos de Biblioteca',
     nivel: 'Projeto B — Full Cycle',
-    documentacao: '/docs',
+    documentacao: '/API/docs',
+    tela: '/',
     rotas: [
-      'GET /health',
-      'GET /metrics',
-      'GET /docs',
-      'POST /livros',
-      'GET /livros',
-      'POST /usuarios',
-      'POST /emprestimos',
-      'PATCH /emprestimos/:id/devolucao',
-      'GET /emprestimos/atrasados',
+      'GET /API/health',
+      'GET /API/metrics',
+      'GET /API/docs',
+      'POST /API/livros',
+      'GET /API/livros',
+      'POST /API/usuarios',
+      'GET /API/usuarios',
+      'POST /API/emprestimos',
+      'GET /API/emprestimos',
+      'PATCH /API/emprestimos/:id/devolucao',
+      'GET /API/emprestimos/atrasados',
     ],
   }))
 
@@ -187,18 +223,29 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
   )
   const devolverEmprestimo = new DevolverEmprestimo(emprestimos, relogio)
 
-  // ------------------------------- Rotas -----------------------------------
-  registrarRotasDeLivros(app, livros)
-  registrarRotasDeUsuarios(app, usuarios)
-  registrarRotasDeEmprestimos(app, {
-    emprestarLivro,
-    devolverEmprestimo,
-    emprestimos,
-    relogio,
-    metricas,
-  })
-
+  // O tratamento de erro precisa ser registrado ANTES das rotas para que as
+  // rotas dentro de /API herdem o mesmo formato de resposta.
   registrarTratamentoDeErros(app)
+
+  // ------------------------------- Rotas -----------------------------------
+  // Tudo que é API fica debaixo de /API. O prefixo é aplicado pelo Fastify,
+  // então os arquivos de rota continuam declarando caminhos curtos
+  // ("/livros", "/emprestimos").
+  app.register(
+    async (api) => {
+      registrarInfraestrutura(api)
+      registrarRotasDeLivros(api, livros)
+      registrarRotasDeUsuarios(api, usuarios)
+      registrarRotasDeEmprestimos(api, {
+        emprestarLivro,
+        devolverEmprestimo,
+        emprestimos,
+        relogio,
+        metricas,
+      })
+    },
+    { prefix: '/API' },
+  )
 
   return app
 }

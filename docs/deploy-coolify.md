@@ -89,13 +89,14 @@ curl -i https://agendadeconsultas.v6.rocks/health
 
 Deve voltar `200` com `{"status":"ok"}`.
 
-A documentação Swagger fica em `https://agendadeconsultas.v6.rocks/docs`. Ela lê o
-`docs/openapi.yaml` que vai junto na imagem Docker.
+A tela de demonstração fica em `https://agendadeconsultas.v6.rocks/`.
+A documentação Swagger fica em `https://agendadeconsultas.v6.rocks/API/docs`.
+Ela lê o `docs/openapi.yaml` que vai junto na imagem Docker.
 
 Depois teste uma rota de verdade:
 
 ```bash
-curl -s -X POST https://agendadeconsultas.v6.rocks/livros \
+curl -s -X POST https://agendadeconsultas.v6.rocks/API/livros \
   -H 'Content-Type: application/json' \
   -d '{"titulo":"DDD","autor":"Eric Evans","isbn":"9780321125217","exemplaresTotal":1}'
 ```

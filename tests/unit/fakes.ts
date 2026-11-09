@@ -83,6 +83,10 @@ export class UsuarioRepositorioFake implements UsuarioRepositorio {
   async buscarPorId(id: string): Promise<Usuario | null> {
     return this.usuarios.find((usuario) => usuario.id === id) ?? null
   }
+
+  async listar(): Promise<Usuario[]> {
+    return [...this.usuarios].sort((a, b) => a.nome.localeCompare(b.nome))
+  }
 }
 
 export class EmprestimoRepositorioFake implements EmprestimoRepositorio {
@@ -175,5 +179,25 @@ export class EmprestimoRepositorioFake implements EmprestimoRepositorio {
     }
 
     return detalhados
+  }
+
+  async listarDetalhados(): Promise<EmprestimoDetalhado[]> {
+    const detalhados: EmprestimoDetalhado[] = []
+
+    for (const emprestimo of this.emprestimos) {
+      const livro = await this.livros.buscarPorId(emprestimo.livroId)
+      const usuario = await this.usuarios.buscarPorId(emprestimo.usuarioId)
+      if (!livro || !usuario) continue
+
+      detalhados.push({
+        ...emprestimo,
+        livro: { id: livro.id, titulo: livro.titulo, autor: livro.autor },
+        usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email },
+      })
+    }
+
+    return detalhados.sort(
+      (a, b) => b.dataEmprestimo.getTime() - a.dataEmprestimo.getTime(),
+    )
   }
 }

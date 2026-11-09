@@ -45,6 +45,8 @@ export interface LivroRepositorio {
 export interface UsuarioRepositorio {
   criar(dados: DadosNovoUsuario): Promise<Usuario>
   buscarPorId(id: string): Promise<Usuario | null>
+  /** Lista todos os usuários em ordem alfabética (usado na tela e na API). */
+  listar(): Promise<Usuario[]>
 }
 
 export interface EmprestimoRepositorio {
@@ -64,4 +66,6 @@ export interface EmprestimoRepositorio {
   buscarPorId(id: string): Promise<Emprestimo | null>
   registrarDevolucao(id: string, dataDevolucao: Date): Promise<Emprestimo>
   listarAtrasados(hoje: Date): Promise<EmprestimoDetalhado[]>
+  /** Lista todos os empréstimos, do mais recente para o mais antigo. */
+  listarDetalhados(): Promise<EmprestimoDetalhado[]>
 }

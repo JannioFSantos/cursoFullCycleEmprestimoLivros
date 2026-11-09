@@ -1,0 +1,1094 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Biblioteca — demonstração da API</title>
+    <link rel="icon" href="data:," />
+    <style>
+      /* ------------------------------------------------------------------
+         Estilo simples, sem framework e sem CDN.
+         A ideia é a página abrir rápido em qualquer lugar, inclusive no
+         servidor do Coolify.
+         ------------------------------------------------------------------ */
+      :root {
+        --azul: #1f4e79;
+        --azul-claro: #e8f1fa;
+        --verde: #1e7a46;
+        --verde-claro: #e6f4ec;
+        --vermelho: #a52727;
+        --vermelho-claro: #fdeaea;
+        --amarelo: #8a6100;
+        --amarelo-claro: #fff4d6;
+        --texto: #1d2733;
+        --texto-fraco: #5b6b7c;
+        --borda: #d6dee7;
+        --fundo: #f4f7fa;
+        --branco: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+        background: var(--fundo);
+        color: var(--texto);
+        line-height: 1.5;
+      }
+
+      .topo {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        background: var(--azul);
+        color: #fff;
+      }
+
+      .topo h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+
+      .topo p {
+        margin: 2px 0 0;
+        color: #cfe0f2;
+        font-size: 0.92rem;
+      }
+
+      .estado-api {
+        border-radius: 999px;
+        padding: 6px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: #ffffff22;
+        border: 1px solid #ffffff55;
+      }
+
+      .estado-api.ok {
+        background: var(--verde-claro);
+        border-color: var(--verde);
+        color: var(--verde);
+      }
+
+      .estado-api.erro {
+        background: var(--vermelho-claro);
+        border-color: var(--vermelho);
+        color: var(--vermelho);
+      }
+
+      .abas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 14px 24px 0;
+        background: var(--branco);
+        border-bottom: 1px solid var(--borda);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .abas button {
+        appearance: none;
+        border: 1px solid transparent;
+        border-bottom: none;
+        background: transparent;
+        color: var(--texto-fraco);
+        padding: 10px 16px;
+        border-radius: 8px 8px 0 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .abas button:hover {
+        background: var(--azul-claro);
+        color: var(--azul);
+      }
+
+      .abas button.ativa {
+        background: var(--fundo);
+        border-color: var(--borda);
+        color: var(--azul);
+        margin-bottom: -1px;
+      }
+
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .aba {
+        display: none;
+      }
+
+      .aba.ativa {
+        display: block;
+      }
+
+      .cartoes {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+
+      .cartao {
+        background: var(--branco);
+        border: 1px solid var(--borda);
+        border-radius: 12px;
+        padding: 16px 18px;
+      }
+
+      .cartao .rotulo {
+        color: var(--texto-fraco);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .cartao .valor {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--azul);
+      }
+
+      .cartao .valor.verde {
+        color: var(--verde);
+      }
+
+      .cartao .valor.vermelho {
+        color: var(--vermelho);
+      }
+
+      .painel {
+        background: var(--branco);
+        border: 1px solid var(--borda);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+
+      .painel h2 {
+        margin: 0 0 4px;
+        font-size: 1.15rem;
+        color: var(--azul);
+      }
+
+      .painel .ajuda {
+        margin: 0 0 16px;
+        color: var(--texto-fraco);
+        font-size: 0.9rem;
+      }
+
+      .formulario {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        align-items: end;
+      }
+
+      .campo {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .campo label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--texto-fraco);
+      }
+
+      .campo input,
+      .campo select {
+        padding: 10px 12px;
+        border: 1px solid var(--borda);
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-family: inherit;
+        background: #fff;
+        color: var(--texto);
+      }
+
+      .campo input:focus,
+      .campo select:focus {
+        outline: 2px solid var(--azul);
+        outline-offset: 1px;
+      }
+
+      .botao {
+        appearance: none;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 18px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--azul);
+        color: #fff;
+      }
+
+      .botao:hover {
+        filter: brightness(1.08);
+      }
+
+      .botao.secundario {
+        background: transparent;
+        color: var(--azul);
+        border: 1px solid var(--azul);
+      }
+
+      .botao.pequeno {
+        padding: 5px 10px;
+        font-size: 0.8rem;
+      }
+
+      .botao:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .tabela-area {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--borda);
+        white-space: nowrap;
+      }
+
+      th {
+        color: var(--texto-fraco);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      tbody tr:hover {
+        background: #f8fbfe;
+      }
+
+      .vazio {
+        color: var(--texto-fraco);
+        font-style: italic;
+      }
+
+      .etiqueta {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      .etiqueta.ativo {
+        background: var(--azul-claro);
+        color: var(--azul);
+      }
+
+      .etiqueta.devolvido {
+        background: var(--verde-claro);
+        color: var(--verde);
+      }
+
+      .etiqueta.atrasado {
+        background: var(--vermelho-claro);
+        color: var(--vermelho);
+      }
+
+      .etiqueta.disponivel {
+        background: var(--verde-claro);
+        color: var(--verde);
+      }
+
+      .etiqueta.esgotado {
+        background: var(--amarelo-claro);
+        color: var(--amarelo);
+      }
+
+      .passos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-top: 8px;
+      }
+
+      .passo {
+        border: 1px dashed var(--borda);
+        border-radius: 10px;
+        padding: 14px;
+      }
+
+      .passo strong {
+        display: block;
+        color: var(--azul);
+      }
+
+      .aviso {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        max-width: 360px;
+        padding: 12px 16px;
+        border-radius: 10px;
+        color: #fff;
+        background: var(--verde);
+        box-shadow: 0 8px 24px #00000033;
+        transform: translateY(20px);
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.2s ease;
+        z-index: 50;
+      }
+
+      .aviso.mostrar {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .aviso.erro {
+        background: var(--vermelho);
+      }
+
+      .rodape {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 8px 24px 32px;
+        color: var(--texto-fraco);
+        font-size: 0.85rem;
+      }
+
+      .rodape a {
+        color: var(--azul);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topo">
+      <div>
+        <h1>Biblioteca</h1>
+        <p>Demonstração da API de empréstimo de livros</p>
+      </div>
+      <div class="estado-api" id="estado-api">verificando API...</div>
+    </header>
+
+    <nav class="abas" aria-label="Seções da demonstração">
+      <button type="button" data-aba="visao" class="ativa">Visão geral</button>
+      <button type="button" data-aba="livros">Livros</button>
+      <button type="button" data-aba="usuarios">Usuários</button>
+      <button type="button" data-aba="emprestimos">Empréstimos</button>
+      <button type="button" data-aba="atrasados">Atrasados</button>
+    </nav>
+
+    <main>
+      <!-- ------------------------------ VISÃO GERAL ------------------------ -->
+      <section id="aba-visao" class="aba ativa">
+        <div class="cartoes">
+          <div class="cartao">
+            <div class="rotulo">Livros cadastrados</div>
+            <div class="valor" id="total-livros">0</div>
+          </div>
+          <div class="cartao">
+            <div class="rotulo">Exemplares disponíveis</div>
+            <div class="valor verde" id="total-disponiveis">0</div>
+          </div>
+          <div class="cartao">
+            <div class="rotulo">Empréstimos ativos</div>
+            <div class="valor" id="total-ativos">0</div>
+          </div>
+          <div class="cartao">
+            <div class="rotulo">Em atraso</div>
+            <div class="valor vermelho" id="total-atrasados">0</div>
+          </div>
+        </div>
+
+        <div class="painel">
+          <h2>Como usar esta demonstração</h2>
+          <p class="ajuda">
+            Tudo aqui conversa com a API real em <code>/API</code>. Se cadastrar
+            um livro e um usuário, você consegue fazer um empréstimo de verdade.
+          </p>
+          <div class="passos">
+            <div class="passo">
+              <strong>1. Cadastre um livro</strong>
+              Na aba <em>Livros</em>, informe título, autor, ISBN e quantos
+              exemplares existem.
+            </div>
+            <div class="passo">
+              <strong>2. Cadastre um usuário</strong>
+              Na aba <em>Usuários</em>, informe nome e e-mail.
+            </div>
+            <div class="passo">
+              <strong>3. Faça o empréstimo</strong>
+              Na aba <em>Empréstimos</em>, escolha o livro e o usuário. O prazo
+              é de 14 dias.
+            </div>
+            <div class="passo">
+              <strong>4. Devolva</strong>
+              Use o botão <em>Devolver</em> na lista de empréstimos.
+            </div>
+          </div>
+        </div>
+
+        <div class="painel">
+          <h2>Últimos empréstimos</h2>
+          <p class="ajuda">Os 5 mais recentes, com quem pegou e qual livro.</p>
+          <div class="tabela-area">
+            <table>
+              <thead>
+                <tr>
+                  <th>Livro</th>
+                  <th>Usuário</th>
+                  <th>Empréstimo</th>
+                  <th>Previsão</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-ultimos"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- -------------------------------- LIVROS --------------------------- -->
+      <section id="aba-livros" class="aba">
+        <div class="painel">
+          <h2>Cadastrar livro</h2>
+          <p class="ajuda">
+            O ISBN precisa ser único. "Exemplares" é a quantidade física que a
+            biblioteca tem.
+          </p>
+          <form class="formulario" id="form-livro">
+            <div class="campo">
+              <label for="livro-titulo">Título</label>
+              <input id="livro-titulo" name="titulo" required maxlength="200" />
+            </div>
+            <div class="campo">
+              <label for="livro-autor">Autor</label>
+              <input id="livro-autor" name="autor" required maxlength="200" />
+            </div>
+            <div class="campo">
+              <label for="livro-isbn">ISBN</label>
+              <input id="livro-isbn" name="isbn" required minlength="10" maxlength="20" />
+            </div>
+            <div class="campo">
+              <label for="livro-exemplares">Exemplares</label>
+              <input
+                id="livro-exemplares"
+                name="exemplaresTotal"
+                type="number"
+                min="1"
+                max="10000"
+                value="1"
+                required
+              />
+            </div>
+            <button class="botao" type="submit">Cadastrar livro</button>
+          </form>
+        </div>
+
+        <div class="painel">
+          <h2>Catálogo</h2>
+          <p class="ajuda">
+            A disponibilidade é calculada pela API: exemplares totais menos os
+            empréstimos ativos.
+          </p>
+          <div class="tabela-area">
+            <table>
+              <thead>
+                <tr>
+                  <th>Título</th>
+                  <th>Autor</th>
+                  <th>ISBN</th>
+                  <th>Total</th>
+                  <th>Emprestados</th>
+                  <th>Disponíveis</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-livros"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------- USUÁRIOS -------------------------- -->
+      <section id="aba-usuarios" class="aba">
+        <div class="painel">
+          <h2>Cadastrar usuário</h2>
+          <p class="ajuda">O e-mail precisa ser único.</p>
+          <form class="formulario" id="form-usuario">
+            <div class="campo">
+              <label for="usuario-nome">Nome</label>
+              <input id="usuario-nome" name="nome" required maxlength="200" />
+            </div>
+            <div class="campo">
+              <label for="usuario-email">E-mail</label>
+              <input
+                id="usuario-email"
+                name="email"
+                type="email"
+                required
+                maxlength="200"
+              />
+            </div>
+            <button class="botao" type="submit">Cadastrar usuário</button>
+          </form>
+        </div>
+
+        <div class="painel">
+          <h2>Usuários cadastrados</h2>
+          <p class="ajuda">A coluna "Empréstimos ativos" conta os livros em mãos.</p>
+          <div class="tabela-area">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>E-mail</th>
+                  <th>Empréstimos ativos</th>
+                  <th>Cadastro</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-usuarios"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------ EMPRÉSTIMOS ------------------------ -->
+      <section id="aba-emprestimos" class="aba">
+        <div class="painel">
+          <h2>Novo empréstimo</h2>
+          <p class="ajuda">
+            Só aparecem livros com exemplar disponível. O prazo é de 14 dias e
+            cada usuário pode ter no máximo 3 empréstimos ativos.
+          </p>
+          <form class="formulario" id="form-emprestimo">
+            <div class="campo">
+              <label for="emprestimo-livro">Livro</label>
+              <select id="emprestimo-livro" name="livroId" required></select>
+            </div>
+            <div class="campo">
+              <label for="emprestimo-usuario">Usuário</label>
+              <select id="emprestimo-usuario" name="usuarioId" required></select>
+            </div>
+            <button class="botao" type="submit">Emprestar</button>
+          </form>
+        </div>
+
+        <div class="painel">
+          <h2>Todos os empréstimos</h2>
+          <p class="ajuda">
+            Mostra quem pegou, qual livro, as datas e o status. Empréstimo ativo
+            pode ser devolvido pelo botão.
+          </p>
+          <div class="tabela-area">
+            <table>
+              <thead>
+                <tr>
+                  <th>Livro</th>
+                  <th>Usuário</th>
+                  <th>Empréstimo</th>
+                  <th>Previsão</th>
+                  <th>Devolução</th>
+                  <th>Status</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-emprestimos"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------- ATRASADOS ------------------------- -->
+      <section id="aba-atrasados" class="aba">
+        <div class="painel">
+          <h2>Empréstimos em atraso</h2>
+          <p class="ajuda">
+            Livros cuja data prevista já passou. Quem está nessa lista não pode
+            pegar outro livro até devolver.
+          </p>
+          <div class="tabela-area">
+            <table>
+              <thead>
+                <tr>
+                  <th>Livro</th>
+                  <th>Usuário</th>
+                  <th>E-mail</th>
+                  <th>Previsão</th>
+                  <th>Dias de atraso</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-atrasados"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="rodape">
+      API em <code>/API</code> · Documentação em
+      <a href="/API/docs">/API/docs</a> · Healthcheck em
+      <a href="/health">/health</a>
+    </footer>
+
+    <div class="aviso" id="aviso" role="status"></div>
+
+    <script>
+      // ---------------------------------------------------------------
+      // Toda a tela é JavaScript puro, sem framework.
+      //
+      // A API é servida no mesmo domínio, então usamos caminhos relativos
+      // ("/API/livros"). Isso funciona em localhost e em produção sem
+      // precisar trocar configuração.
+      // ---------------------------------------------------------------
+      const API = '/API'
+
+      // Atalho para pegar um elemento pelo id.
+      const porId = (id) => document.getElementById(id)
+
+      // Dados que vieram da API e ficam guardados na memória da página.
+      let livros = []
+      let usuarios = []
+      let emprestimos = []
+
+      // ---------------------------------------------------------------
+      // Utilitários
+      // ---------------------------------------------------------------
+
+      // Escapa texto antes de colocar dentro do HTML. Sem isso, um título
+      // com "<script>" poderia quebrar a página (XSS).
+      function escapar(valor) {
+        return String(valor ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;')
+      }
+
+      // Datas da API vêm em UTC e à meia-noite. Usamos getUTC* para não
+      // mostrar o dia anterior por causa do fuso do Brasil.
+      function formatarData(iso) {
+        if (!iso) return '—'
+        const data = new Date(iso)
+        const dia = String(data.getUTCDate()).padStart(2, '0')
+        const mes = String(data.getUTCMonth() + 1).padStart(2, '0')
+        return `${dia}/${mes}/${data.getUTCFullYear()}`
+      }
+
+      // Mostra um aviso no canto da tela por alguns segundos.
+      let temporizadorDoAviso
+      function avisar(mensagem, tipo = 'ok') {
+        const caixa = porId('aviso')
+        caixa.textContent = mensagem
+        caixa.className = 'aviso mostrar' + (tipo === 'erro' ? ' erro' : '')
+
+        clearTimeout(temporizadorDoAviso)
+        temporizadorDoAviso = setTimeout(() => {
+          caixa.className = 'aviso'
+        }, 4000)
+      }
+
+      // Chama a API e já trata o formato de erro padrão:
+      // { erro: { codigo, mensagem } }
+      async function chamarApi(caminho, opcoes = {}) {
+        // O cabeçalho de JSON só entra quando existe corpo. PATCH de devolução
+        // não manda corpo, e o Fastify recusa JSON vazio.
+        const opcoesDaRequisicao = { ...opcoes }
+
+        if (opcoesDaRequisicao.body) {
+          opcoesDaRequisicao.headers = {
+            'Content-Type': 'application/json',
+            ...(opcoes.headers ?? {}),
+          }
+        }
+
+        const resposta = await fetch(API + caminho, opcoesDaRequisicao)
+
+        const texto = await resposta.text()
+        const dados = texto ? JSON.parse(texto) : null
+
+        if (!resposta.ok) {
+          const mensagem =
+            dados && dados.erro && dados.erro.mensagem
+              ? dados.erro.mensagem
+              : `A API respondeu ${resposta.status}.`
+          throw new Error(mensagem)
+        }
+
+        return dados
+      }
+
+      // Um empréstimo está atrasado quando está ATIVO e a previsão é
+      // anterior ao dia de hoje (em UTC, igual à API).
+      function estaAtrasado(emprestimo) {
+        if (emprestimo.status !== 'ATIVO') return false
+
+        const agora = new Date()
+        const hoje = Date.UTC(
+          agora.getUTCFullYear(),
+          agora.getUTCMonth(),
+          agora.getUTCDate(),
+        )
+
+        return new Date(emprestimo.dataPrevista).getTime() < hoje
+      }
+
+      function diasDeAtraso(emprestimo) {
+        const agora = new Date()
+        const hoje = Date.UTC(
+          agora.getUTCFullYear(),
+          agora.getUTCMonth(),
+          agora.getUTCDate(),
+        )
+        const prevista = new Date(emprestimo.dataPrevista).getTime()
+        return Math.max(0, Math.round((hoje - prevista) / 86400000))
+      }
+
+      // ---------------------------------------------------------------
+      // Carregar dados
+      // ---------------------------------------------------------------
+      async function carregarTudo() {
+        const [respostaLivros, respostaUsuarios, respostaEmprestimos] =
+          await Promise.all([
+            chamarApi('/livros'),
+            chamarApi('/usuarios'),
+            chamarApi('/emprestimos'),
+          ])
+
+        livros = respostaLivros.itens
+        usuarios = respostaUsuarios.itens
+        emprestimos = respostaEmprestimos.itens
+
+        desenharVisaoGeral()
+        desenharLivros()
+        desenharUsuarios()
+        desenharEmprestimos()
+        desenharAtrasados()
+        preencherSelects()
+      }
+
+      async function verificarApi() {
+        const caixa = porId('estado-api')
+        try {
+          await chamarApi('/health')
+          caixa.textContent = 'API online'
+          caixa.className = 'estado-api ok'
+        } catch {
+          caixa.textContent = 'API indisponível'
+          caixa.className = 'estado-api erro'
+        }
+      }
+
+      // ---------------------------------------------------------------
+      // Desenho das telas
+      // ---------------------------------------------------------------
+      function desenharVisaoGeral() {
+        const ativos = emprestimos.filter((e) => e.status === 'ATIVO')
+        const atrasados = emprestimos.filter(estaAtrasado)
+        const disponiveis = livros.reduce(
+          (soma, livro) => soma + livro.exemplaresDisponiveis,
+          0,
+        )
+
+        porId('total-livros').textContent = livros.length
+        porId('total-disponiveis').textContent = disponiveis
+        porId('total-ativos').textContent = ativos.length
+        porId('total-atrasados').textContent = atrasados.length
+
+        const ultimos = emprestimos.slice(0, 5)
+        porId('tabela-ultimos').innerHTML = ultimos.length
+          ? ultimos
+              .map(
+                (e) => `
+                  <tr>
+                    <td>${escapar(e.livro.titulo)}</td>
+                    <td>${escapar(e.usuario.nome)}</td>
+                    <td>${formatarData(e.dataEmprestimo)}</td>
+                    <td>${formatarData(e.dataPrevista)}</td>
+                    <td>${etiquetaStatus(e)}</td>
+                  </tr>
+                `,
+              )
+              .join('')
+          : linhaVazia(5, 'Nenhum empréstimo ainda.')
+      }
+
+      function etiquetaStatus(emprestimo) {
+        if (estaAtrasado(emprestimo)) {
+          return '<span class="etiqueta atrasado">Atrasado</span>'
+        }
+        if (emprestimo.status === 'DEVOLVIDO') {
+          return '<span class="etiqueta devolvido">Devolvido</span>'
+        }
+        return '<span class="etiqueta ativo">Ativo</span>'
+      }
+
+      function linhaVazia(colunas, mensagem) {
+        return `<tr><td colspan="${colunas}" class="vazio">${mensagem}</td></tr>`
+      }
+
+      function desenharLivros() {
+        porId('tabela-livros').innerHTML = livros.length
+          ? livros
+              .map(
+                (livro) => `
+                  <tr>
+                    <td>${escapar(livro.titulo)}</td>
+                    <td>${escapar(livro.autor)}</td>
+                    <td>${escapar(livro.isbn)}</td>
+                    <td>${livro.exemplaresTotal}</td>
+                    <td>${livro.emprestimosAtivos}</td>
+                    <td>${
+                      livro.exemplaresDisponiveis > 0
+                        ? `<span class="etiqueta disponivel">${livro.exemplaresDisponiveis} disponível(is)</span>`
+                        : '<span class="etiqueta esgotado">Esgotado</span>'
+                    }</td>
+                  </tr>
+                `,
+              )
+              .join('')
+          : linhaVazia(6, 'Nenhum livro cadastrado ainda.')
+      }
+
+      function desenharUsuarios() {
+        porId('tabela-usuarios').innerHTML = usuarios.length
+          ? usuarios
+              .map((usuario) => {
+                const ativos = emprestimos.filter(
+                  (e) => e.usuarioId === usuario.id && e.status === 'ATIVO',
+                ).length
+
+                return `
+                  <tr>
+                    <td>${escapar(usuario.nome)}</td>
+                    <td>${escapar(usuario.email)}</td>
+                    <td>${ativos}</td>
+                    <td>${formatarData(usuario.criadoEm)}</td>
+                  </tr>
+                `
+              })
+              .join('')
+          : linhaVazia(4, 'Nenhum usuário cadastrado ainda.')
+      }
+
+      function desenharEmprestimos() {
+        porId('tabela-emprestimos').innerHTML = emprestimos.length
+          ? emprestimos
+              .map(
+                (e) => `
+                  <tr>
+                    <td>${escapar(e.livro.titulo)}</td>
+                    <td>${escapar(e.usuario.nome)}</td>
+                    <td>${formatarData(e.dataEmprestimo)}</td>
+                    <td>${formatarData(e.dataPrevista)}</td>
+                    <td>${e.dataDevolucao ? formatarData(e.dataDevolucao) : '—'}</td>
+                    <td>${etiquetaStatus(e)}</td>
+                    <td>${
+                      e.status === 'ATIVO'
+                        ? `<button type="button" class="botao pequeno" data-devolver="${e.id}">Devolver</button>`
+                        : '—'
+                    }</td>
+                  </tr>
+                `,
+              )
+              .join('')
+          : linhaVazia(7, 'Nenhum empréstimo registrado ainda.')
+      }
+
+      function desenharAtrasados() {
+        const atrasados = emprestimos.filter(estaAtrasado)
+
+        porId('tabela-atrasados').innerHTML = atrasados.length
+          ? atrasados
+              .map(
+                (e) => `
+                  <tr>
+                    <td>${escapar(e.livro.titulo)}</td>
+                    <td>${escapar(e.usuario.nome)}</td>
+                    <td>${escapar(e.usuario.email)}</td>
+                    <td>${formatarData(e.dataPrevista)}</td>
+                    <td>${diasDeAtraso(e)} dia(s)</td>
+                  </tr>
+                `,
+              )
+              .join('')
+          : linhaVazia(5, 'Nenhum empréstimo em atraso. Tudo em dia!')
+      }
+
+      // Preenche os selects do formulário de empréstimo.
+      function preencherSelects() {
+        const selectLivro = porId('emprestimo-livro')
+        const selectUsuario = porId('emprestimo-usuario')
+
+        const livrosDisponiveis = livros.filter(
+          (livro) => livro.exemplaresDisponiveis > 0,
+        )
+
+        selectLivro.innerHTML = livrosDisponiveis.length
+          ? livrosDisponiveis
+              .map(
+                (livro) =>
+                  `<option value="${livro.id}">${escapar(
+                    livro.titulo,
+                  )} (${livro.exemplaresDisponiveis} disponível(is))</option>`,
+              )
+              .join('')
+          : '<option value="">Nenhum livro disponível</option>'
+
+        selectUsuario.innerHTML = usuarios.length
+          ? usuarios
+              .map(
+                (usuario) =>
+                  `<option value="${usuario.id}">${escapar(
+                    usuario.nome,
+                  )} — ${escapar(usuario.email)}</option>`,
+              )
+              .join('')
+          : '<option value="">Nenhum usuário cadastrado</option>'
+
+        const semLivro = livrosDisponiveis.length === 0
+        const semUsuario = usuarios.length === 0
+        selectLivro.disabled = semLivro
+        selectUsuario.disabled = semUsuario
+        porId('form-emprestimo').querySelector('button').disabled =
+          semLivro || semUsuario
+      }
+
+      // ---------------------------------------------------------------
+      // Ações dos formulários
+      // ---------------------------------------------------------------
+      porId('form-livro').addEventListener('submit', async (evento) => {
+        evento.preventDefault()
+
+        const formulario = evento.target
+        const dados = {
+          titulo: formulario.titulo.value.trim(),
+          autor: formulario.autor.value.trim(),
+          isbn: formulario.isbn.value.trim(),
+          exemplaresTotal: Number(formulario.exemplaresTotal.value),
+        }
+
+        try {
+          await chamarApi('/livros', {
+            method: 'POST',
+            body: JSON.stringify(dados),
+          })
+          formulario.reset()
+          formulario.exemplaresTotal.value = '1'
+          avisar('Livro cadastrado com sucesso.')
+          await carregarTudo()
+        } catch (erro) {
+          avisar(erro.message, 'erro')
+        }
+      })
+
+      porId('form-usuario').addEventListener('submit', async (evento) => {
+        evento.preventDefault()
+
+        const formulario = evento.target
+        const dados = {
+          nome: formulario.nome.value.trim(),
+          email: formulario.email.value.trim(),
+        }
+
+        try {
+          await chamarApi('/usuarios', {
+            method: 'POST',
+            body: JSON.stringify(dados),
+          })
+          formulario.reset()
+          avisar('Usuário cadastrado com sucesso.')
+          await carregarTudo()
+        } catch (erro) {
+          avisar(erro.message, 'erro')
+        }
+      })
+
+      porId('form-emprestimo').addEventListener('submit', async (evento) => {
+        evento.preventDefault()
+
+        const dados = {
+          livroId: porId('emprestimo-livro').value,
+          usuarioId: porId('emprestimo-usuario').value,
+        }
+
+        try {
+          await chamarApi('/emprestimos', {
+            method: 'POST',
+            body: JSON.stringify(dados),
+          })
+          avisar('Empréstimo registrado. Prazo de 14 dias.')
+          await carregarTudo()
+        } catch (erro) {
+          avisar(erro.message, 'erro')
+        }
+      })
+
+      // Um único listener atende todos os botões "Devolver", porque a tabela
+      // é redesenhada a cada atualização.
+      porId('tabela-emprestimos').addEventListener('click', async (evento) => {
+        const botao = evento.target.closest('[data-devolver]')
+        if (!botao) return
+
+        botao.disabled = true
+
+        try {
+          await chamarApi(`/emprestimos/${botao.dataset.devolver}/devolucao`, {
+            method: 'PATCH',
+          })
+          avisar('Devolução registrada.')
+          await carregarTudo()
+        } catch (erro) {
+          botao.disabled = false
+          avisar(erro.message, 'erro')
+        }
+      })
+
+      // ---------------------------------------------------------------
+      // Abas
+      // ---------------------------------------------------------------
+      document.querySelectorAll('[data-aba]').forEach((botao) => {
+        botao.addEventListener('click', () => {
+          const alvo = botao.dataset.aba
+
+          document
+            .querySelectorAll('[data-aba]')
+            .forEach((outro) => outro.classList.toggle('ativa', outro === botao))
+
+          document
+            .querySelectorAll('.aba')
+            .forEach((secao) =>
+              secao.classList.toggle('ativa', secao.id === `aba-${alvo}`),
+            )
+        })
+      })
+
+      // ---------------------------------------------------------------
+      // Começo de tudo
+      // ---------------------------------------------------------------
+      verificarApi()
+      carregarTudo().catch((erro) => {
+        avisar('Não foi possível carregar os dados: ' + erro.message, 'erro')
+      })
+    </script>
+  </body>
+</html>
