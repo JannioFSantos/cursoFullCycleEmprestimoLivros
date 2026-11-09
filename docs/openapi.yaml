@@ -1,0 +1,467 @@
+openapi: 3.1.0
+
+info:
+  title: API de Empréstimos de Biblioteca
+  version: 1.0.0
+  summary: Controle de empréstimo e devolução de livros
+  description: |
+    API de domínio único do Projeto B do curso Full Cycle.
+
+    Fluxo principal: cadastrar livro e usuário, emprestar um exemplar,
+    devolver e consultar atrasados.
+
+    Regras de negócio:
+    - só empresta se houver exemplar disponível;
+    - usuário com empréstimo atrasado não pega livro novo;
+    - máximo de 3 empréstimos ativos por usuário;
+    - prazo padrão de 14 dias (configurável por `PRAZO_DIAS`).
+  contact:
+    name: Jannio Ferreira dos Santos
+    url: https://github.com/JannioFSantos/cursoFullCycleEmprestimoLivros
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Ambiente local (docker compose)
+  - url: https://api.seu-dominio.com
+    description: Produção no Coolify (substitua pelo domínio real)
+
+tags:
+  - name: Infraestrutura
+    description: Saúde da aplicação e métricas
+  - name: Livros
+    description: Catálogo e disponibilidade de exemplares
+  - name: Usuários
+    description: Cadastro de leitores
+  - name: Empréstimos
+    description: Fluxo principal de empréstimo e devolução
+
+paths:
+  /health:
+    get:
+      tags: [Infraestrutura]
+      operationId: verificarSaude
+      summary: Healthcheck
+      description: Verifica se a API está de pé e se o PostgreSQL responde.
+      responses:
+        '200':
+          description: API e banco saudáveis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, uptimeSegundos]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  uptimeSegundos:
+                    type: integer
+                    minimum: 0
+        '503':
+          description: API viva, mas banco indisponível
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+
+  /livros:
+    get:
+      tags: [Livros]
+      operationId: listarLivros
+      summary: Lista o catálogo com disponibilidade calculada
+      description: |
+        Devolve todos os livros ordenados por título. Cada item traz
+        `emprestimosAtivos` e `exemplaresDisponiveis` calculados na consulta.
+      responses:
+        '200':
+          description: Lista de livros
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LivroComDisponibilidade'
+    post:
+      tags: [Livros]
+      operationId: criarLivro
+      summary: Cadastra um livro
+      description: O ISBN precisa ser único. `exemplaresTotal` é a quantidade física disponível.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovoLivro'
+      responses:
+        '201':
+          description: Livro criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Livro'
+        '400':
+          $ref: '#/components/responses/DadosInvalidos'
+        '409':
+          $ref: '#/components/responses/Conflito'
+
+  /usuarios:
+    post:
+      tags: [Usuários]
+      operationId: criarUsuario
+      summary: Cadastra um usuário
+      description: O e-mail precisa ser único e válido.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovoUsuario'
+      responses:
+        '201':
+          description: Usuário criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/DadosInvalidos'
+        '409':
+          $ref: '#/components/responses/Conflito'
+
+  /usuarios/{id}:
+    get:
+      tags: [Usuários]
+      operationId: buscarUsuario
+      summary: Busca um usuário pelo id
+      description: Retorna 404 no formato padrão de erro quando o id não existe.
+      parameters:
+        - $ref: '#/components/parameters/IdDoRecurso'
+      responses:
+        '200':
+          description: Usuário encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+
+  /emprestimos:
+    post:
+      tags: [Empréstimos]
+      operationId: criarEmprestimo
+      summary: Empresta um exemplar
+      description: |
+        Cria um empréstimo ATIVO com prazo de 14 dias.
+
+        Pode responder 409 com um destes códigos:
+        - `LIVRO_INDISPONIVEL`
+        - `USUARIO_COM_ATRASO`
+        - `LIMITE_ATINGIDO`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovoEmprestimo'
+      responses:
+        '201':
+          description: Empréstimo criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Emprestimo'
+        '400':
+          $ref: '#/components/responses/DadosInvalidos'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+
+  /emprestimos/{id}/devolucao:
+    patch:
+      tags: [Empréstimos]
+      operationId: devolverEmprestimo
+      summary: Registra a devolução de um empréstimo
+      description: |
+        Marca o empréstimo como DEVOLVIDO e grava a data da devolução.
+        Devolver duas vezes retorna 409 `EMPRESTIMO_JA_DEVOLVIDO`.
+      parameters:
+        - $ref: '#/components/parameters/IdDoRecurso'
+      responses:
+        '200':
+          description: Empréstimo devolvido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Emprestimo'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+
+  /emprestimos/atrasados:
+    get:
+      tags: [Empréstimos]
+      operationId: listarEmprestimosAtrasados
+      summary: Lista empréstimos ativos com data prevista vencida
+      description: Ordenados do mais antigo para o mais recente.
+      responses:
+        '200':
+          description: Lista de atrasados
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmprestimoDetalhado'
+
+components:
+  parameters:
+    IdDoRecurso:
+      name: id
+      in: path
+      required: true
+      description: Identificador UUID do recurso
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    DadosInvalidos:
+      description: Corpo ou parâmetro inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoEncontrado:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    Conflito:
+      description: Operação conflita com uma regra de negócio
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+
+  schemas:
+    NovoLivro:
+      type: object
+      additionalProperties: false
+      required: [titulo, autor, isbn, exemplaresTotal]
+      properties:
+        titulo:
+          type: string
+          minLength: 1
+          maxLength: 200
+          examples: [Clean Code]
+        autor:
+          type: string
+          minLength: 1
+          maxLength: 200
+          examples: [Robert C. Martin]
+        isbn:
+          type: string
+          minLength: 10
+          maxLength: 20
+          examples: ['9780132350884']
+        exemplaresTotal:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          examples: [3]
+
+    Livro:
+      type: object
+      required: [id, titulo, autor, isbn, exemplaresTotal, criadoEm]
+      properties:
+        id:
+          type: string
+          format: uuid
+        titulo:
+          type: string
+        autor:
+          type: string
+        isbn:
+          type: string
+        exemplaresTotal:
+          type: integer
+        criadoEm:
+          type: string
+          format: date-time
+
+    LivroComDisponibilidade:
+      type: object
+      required:
+        [id, titulo, autor, isbn, exemplaresTotal, emprestimosAtivos, exemplaresDisponiveis]
+      properties:
+        id:
+          type: string
+          format: uuid
+        titulo:
+          type: string
+        autor:
+          type: string
+        isbn:
+          type: string
+        exemplaresTotal:
+          type: integer
+        emprestimosAtivos:
+          type: integer
+        exemplaresDisponiveis:
+          type: integer
+
+    NovoUsuario:
+      type: object
+      additionalProperties: false
+      required: [nome, email]
+      properties:
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 200
+          examples: [Ana Souza]
+        email:
+          type: string
+          format: email
+          maxLength: 200
+          examples: [ana@exemplo.com]
+
+    Usuario:
+      type: object
+      required: [id, nome, email, criadoEm]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+        criadoEm:
+          type: string
+          format: date-time
+
+    NovoEmprestimo:
+      type: object
+      additionalProperties: false
+      required: [livroId, usuarioId]
+      properties:
+        livroId:
+          type: string
+          format: uuid
+        usuarioId:
+          type: string
+          format: uuid
+
+    Emprestimo:
+      type: object
+      required:
+        [id, livroId, usuarioId, status, dataEmprestimo, dataPrevista, dataDevolucao]
+      properties:
+        id:
+          type: string
+          format: uuid
+        livroId:
+          type: string
+          format: uuid
+        usuarioId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ATIVO, DEVOLVIDO]
+        dataEmprestimo:
+          type: string
+          format: date-time
+        dataPrevista:
+          type: string
+          format: date-time
+          description: Sempre à meia-noite UTC do dia limite.
+        dataDevolucao:
+          type: [string, 'null']
+          format: date-time
+
+    EmprestimoDetalhado:
+      type: object
+      required:
+        [id, livroId, usuarioId, status, dataEmprestimo, dataPrevista, dataDevolucao, livro, usuario]
+      properties:
+        id:
+          type: string
+          format: uuid
+        livroId:
+          type: string
+          format: uuid
+        usuarioId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ATIVO, DEVOLVIDO]
+        dataEmprestimo:
+          type: string
+          format: date-time
+        dataPrevista:
+          type: string
+          format: date-time
+        dataDevolucao:
+          type: [string, 'null']
+          format: date-time
+        livro:
+          type: object
+          required: [id, titulo, autor]
+          properties:
+            id:
+              type: string
+              format: uuid
+            titulo:
+              type: string
+            autor:
+              type: string
+        usuario:
+          type: object
+          required: [id, nome, email]
+          properties:
+            id:
+              type: string
+              format: uuid
+            nome:
+              type: string
+            email:
+              type: string
+              format: email
+
+    Erro:
+      type: object
+      required: [erro]
+      properties:
+        erro:
+          type: object
+          required: [codigo, mensagem]
+          properties:
+            codigo:
+              type: string
+              examples: [LIVRO_INDISPONIVEL]
+            mensagem:
+              type: string
+              examples: [Não há exemplar disponível para este livro.]
+            detalhes:
+              description: Presente em erros de validação (campo -> mensagens).
+              type: object
+              additionalProperties: true
