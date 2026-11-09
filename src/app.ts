@@ -96,6 +96,23 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
       deepLinking: true, // cada rota tem um link próprio
       persistAuthorization: true, // não perde o token ao recarregar
     },
+    // Em produção a API usa o próprio domínio + /API, então o seletor de
+    // servidores do Swagger não acrescenta nada. Escondemos só nesse domínio;
+    // no localhost ele continua aparecendo para quem está desenvolvendo.
+    theme: {
+      js: [
+        {
+          filename: 'ocultar-servidores-em-producao.js',
+          content: `
+            if (window.location.hostname === 'agendadeconsultas.v6.rocks') {
+              const estilo = document.createElement('style')
+              estilo.textContent = '.swagger-ui .scheme-container { display: none; }'
+              document.head.appendChild(estilo)
+            }
+          `,
+        },
+      ],
+    },
   })
 
   // ------------------------- Observabilidade -------------------------------
