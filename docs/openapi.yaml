@@ -27,11 +27,7 @@ info:
 
 servers:
   - url: /API
-    description: Mesmo servidor desta página (funciona local e em produção)
-  - url: http://localhost:3000/API
-    description: Ambiente local (docker compose)
-  - url: https://agendadeconsultas.v6.rocks/API
-    description: Produção no Coolify
+    description: API no mesmo domínio desta página (local e produção)
 
 tags:
   - name: Infraestrutura
