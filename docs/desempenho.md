@@ -1,187 +1,118 @@
-# Desempenho — metodologia, números e gargalo
+# Desempenho
 
-> **Regra deste documento:** todo número aqui foi medido, não estimado. Os
-> comandos de reprodução estão no fim.
+Aqui estão os números que medi e como medi. Não coloquei estimativa: tudo saiu
+de execução de verdade.
 
-## Ambiente do teste
+## Onde rodei
 
-| Item | Valor |
+- Windows 11 com Docker Desktop;
+- API em container `node:22-alpine`;
+- PostgreSQL em container `postgres:16-alpine`;
+- k6 em container, na mesma rede;
+- sem cache e sem tuning.
+
+## Smoke test
+
+O `k6/smoke.js` faz o fluxo completo uma vez: cria livro, cria usuário,
+empresta, devolve e lista atrasados.
+
+| Item | Resultado |
 | --- | --- |
-| Data | 09/11/2026 |
-| Máquina | Windows 11, Docker Desktop (WSL2) |
-| API | container `node:22-alpine`, 1 processo Node |
-| Banco | container `postgres:16-alpine` |
-| Rede | containers na mesma rede local do Compose |
-| Dados no banco no início | ~2.700 empréstimos (criados pelo próprio k6) |
-| k6 | `grafana/k6` em container, na mesma rede |
+| Checks | 5 de 5 (100%) |
+| Requisições com erro | 0% |
+| p95 | 58,83 ms |
 
-Não houve tuning: sem pool extra, sem cache, sem réplica, sem índice novo. É o
-projeto como está no repositório.
+## Teste de carga
 
----
+O `k6/load.js` roda 1 minuto com dois cenários ao mesmo tempo:
 
-## 1. Smoke test (`k6/smoke.js`)
+- 20 usuários virtuais lendo `GET /livros`;
+- até 10 usuários virtuais criando empréstimos em `POST /emprestimos`.
 
-Um usuário virtual, uma iteração, fluxo completo: criar livro, criar usuário,
-emprestar, devolver, listar atrasados.
+Um detalhe importante: no teste de escrita, **todos pedem o mesmo livro**.
+Fiz assim de propósito para forçar a disputa pelo `FOR UPDATE`. Na vida real
+os pedidos se espalham entre vários livros.
 
-| Métrica | Resultado | Threshold | Situação |
-| --- | --- | --- | --- |
-| Checks | 100% (5/5) | > 99% | ✅ |
-| `http_req_failed` | 0,00% | < 1% | ✅ |
-| p95 de duração | **58,83 ms** | < 300 ms | ✅ |
-
-O smoke test é binário: se ele falha, o teste de carga não faz sentido.
-
----
-
-## 2. Teste de carga (`k6/load.js`)
-
-Dois cenários simultâneos por 1 minuto:
-
-- **leituras:** 20 VUs em `GET /livros`;
-- **escritas:** rampa de 0→10 VUs em `POST /emprestimos`.
-
-Todas as escritas apontam para o **mesmo livro** de propósito. É o pior caso
-para o `SELECT ... FOR UPDATE`: todo mundo disputa a mesma linha.
-
-### Resultado geral
-
-| Métrica | Valor |
+| Item | Resultado |
 | --- | --- |
-| Requisições HTTP | 42.947 |
-| Throughput | **~687 req/s** |
-| Checks | **100%** (42.646/42.646) |
-| Duração do teste | 1m02s |
+| Total de requisições | 42.947 |
+| Requisições por segundo | ~687 |
+| Checks | 100% (42.646 de 42.646) |
 
-### Por cenário
+| Cenário | p90 | p95 | Limite | Passou? |
+| --- | --- | --- | --- | --- |
+| Leitura (`GET /livros`) | 37,44 ms | 41,28 ms | 300 ms | Sim |
+| Escrita (`POST /emprestimos`) | 242,37 ms | 264,48 ms | 500 ms | Sim |
 
-| Cenário | Requisições | p90 | **p95** | Threshold | Situação |
-| --- | --- | --- | --- | --- | --- | --- |
-| Leituras (`GET /livros`) | 40.237 | 37,44 ms | **41,28 ms** | < 300 ms | ✅ |
-| Escritas (`POST /emprestimos`) | 2.710 | 242,37 ms | **264,48 ms** | < 500 ms | ✅ |
+### Por que apareceram 409
 
-### Sobre os 409
+No cenário de escrita, 1.513 de 2.710 requisições receberam `409`. Isso está
+certo: cada usuário só pode ter 3 empréstimos ativos, e o teste tinha 300
+usuários. O k6 conta `409` como requisição "falha" por padrão, por isso o
+número geral de erro apareceu como 3,52%, mesmo com 100% dos checks passando.
 
-No cenário de escrita, **1.513 de 2.710 requisições (55,8%)** receberam `409` —
-e isso está correto. O cenário tem 300 usuários e cada um pode ter no máximo 3
-empréstimos ativos; depois disso a regra de limite entra em ação. O k6 conta
-4xx como "request failed" por padrão, por isso o número agregado de
-`http_req_failed` aparece como 3,52%, mesmo com **100% dos checks passando**.
+Ou seja: nesse projeto, olhar só a taxa de erro do k6 engana. O que importa é
+o check de negócio (201 ou 409) e o tempo.
 
-Conclusão: `http_req_failed` isolado engana neste domínio. O que importa é o
-check de negócio (201 ou 409) e a latência.
+### Por que a escrita é mais lenta
 
----
+A leitura faz uma consulta simples. A escrita faz, dentro de uma transação:
 
-## 3. Onde está o gargalo
+1. trava a linha do livro;
+2. trava a linha do usuário;
+3. faz três consultas de contagem;
+4. insere o empréstimo.
 
-### Leitura vs escrita
+Com todo mundo pedindo o mesmo livro, as transações esperam umas pelas outras.
+Por isso o p95 fica em 264 ms. É o custo de garantir que o mesmo exemplar não
+seja emprestado duas vezes.
 
-```
-leitura  p95 =  41,28 ms
-escrita  p95 = 264,48 ms   -> 6,4x mais lenta
-```
+## Teste do índice
 
-A diferença não é da consulta: `GET /livros` faz um `findMany` com `_count`
-(uma ida ao banco). A escrita faz, dentro de uma transação:
-
-1. `SELECT ... FOR UPDATE` no livro (espera se outro estiver com a linha);
-2. `SELECT ... FOR UPDATE` no usuário;
-3. três consultas de contagem/atraso;
-4. `INSERT`.
-
-Com 10 VUs batendo no **mesmo livro**, as transações serializam. O p95 de
-264 ms é o **limite superior pessimista** dessa arquitetura, não a média do
-uso real (onde empréstimos se distribuem entre livros).
-
-Isso é coerente com o ADR 0001: aceitamos serializar por livro em troca de
-nunca entregar o mesmo exemplar duas vezes. Um teste com livros diferentes
-mostraria p95 bem menor, mas esconderia o custo da decisão.
-
-### Índice: antes e depois (20 mil empréstimos)
-
-Consulta usada na disponibilidade:
+Para ver se o índice faz diferença, gerei 20 mil empréstimos com
+`npm run db:seed:volume` e rodei a consulta da disponibilidade com e sem o
+índice `(livro_id, status)`.
 
 ```sql
 SELECT count(*) FROM emprestimos
 WHERE livro_id = $1 AND status = 'ATIVO';
 ```
 
-| Cenário | Plano | Buffers | Tempo de execução |
+| Situação | Plano | Buffers | Tempo |
 | --- | --- | --- | --- |
-| **Com** índice `(livro_id, status)` | Index Only Scan | 42 | **0,601 ms** |
-| **Sem** o índice | Seq Scan (19.960 linhas filtradas) | 266 | **2,439 ms** |
+| Com índice | Index Only Scan | 42 | 0,601 ms |
+| Sem índice | Seq Scan (19.960 linhas filtradas) | 266 | 2,439 ms |
 
-Ganho: **~4x no tempo** e **~6,3x menos buffers** com apenas 20 mil linhas. O
-índice existe no `schema.prisma` (`@@index([livroId, status])`), então já vai
-junto na migration.
+Com o índice foi umas 4 vezes mais rápido e leu bem menos páginas do banco. O
+índice já está no `schema.prisma` e vai junto na migration.
 
-Consulta de atrasados usa `(status, data_prevista)`:
+A consulta de atrasados usa o índice `(status, data_prevista)` e levou 7,3 ms
+para 14.990 linhas.
 
-```
-Index Scan using emprestimos_status_data_prevista_idx
-Execution Time: 7,334 ms (14.990 linhas)
-```
+## O que eu faria diferente
 
-Sem esse índice, o mesmo `ORDER BY data_prevista` exigiria ordenação em
-memória sobre a tabela inteira.
+1. Fazer um teste de carga com livros diferentes, para comparar com esse pior
+   caso.
+2. Colocar cache no `GET /livros`, que é a maior parte das requisições.
+3. Se um dia precisar, travar por usuário para melhorar a disputa do limite de
+   3 empréstimos.
 
-### O que ainda não é gargalo
+O que eu não faria é trocar o `FOR UPDATE` por uma coluna contador só para
+melhorar o número. O risco de dado errado não compensa.
 
-- `GET /livros` com 20 VUs: p95 de 41 ms, folga grande para o SLO de 300 ms.
-- O pool de conexões padrão do Prisma (2×CPU+1) não foi esgotado no teste.
-- Não há N+1: a listagem usa um único `findMany` com `_count`.
-
----
-
-## 4. O que eu faria diferente
-
-Em ordem de custo/benefício:
-
-1. **Teste com livros distintos.** Medir o cenário realista (concorrência
-   distribuída) para comparar com o pior caso deste documento.
-2. **Cache de `GET /livros`** com invalidação nos eventos de empréstimo e
-   devolução — reduz o tráfego de leitura, que hoje é 94% das requisições.
-3. **Lock por usuário** apenas para o limite de 3, se o volume justificar; hoje
-   o lock do livro já resolve o risco crítico.
-4. **Métricas de pool e de lock** (`pg_stat_activity`, tempo de espera) para
-   separar "API lenta" de "banco saturado".
-
-O que eu **não** faria: trocar o `FOR UPDATE` por uma coluna contador só para
-melhorar o p95. O ganho não paga o risco de divergência de dados (ADR 0001).
-
----
-
-## 5. Como reproduzir
+## Como reproduzir
 
 ```bash
-# 1. subir tudo
 docker compose up -d --build
 
-# 2. smoke (dentro da rede do Compose)
 docker run --rm --network cursofullcycleemprestimolivros_default \
   -e BASE_URL=http://api:3000 -v "${PWD}/k6:/scripts" \
   grafana/k6 run /scripts/smoke.js
 
-# 3. carga (1 minuto)
 docker run --rm --network cursofullcycleemprestimolivros_default \
   -e BASE_URL=http://api:3000 -v "${PWD}/k6:/scripts" \
   grafana/k6 run /scripts/load.js
-
-# 4. experimento de índice
-npm run db:seed:volume
-docker exec biblioteca-db psql -U postgres -d biblioteca -c \
-  "EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM emprestimos
-   WHERE livro_id = '<id>' AND status = 'ATIVO';"
 ```
 
-Para o passo 4, pegue um `livro_id` com muitos empréstimos:
-
-```sql
-SELECT livro_id, count(*) FROM emprestimos
-WHERE status = 'ATIVO' GROUP BY 1 ORDER BY 2 DESC LIMIT 1;
-```
-
-O script `db:seed:volume` **apaga os empréstimos existentes**. Rode só no banco
+O `npm run db:seed:volume` apaga os empréstimos existentes. Use só no banco
 local.

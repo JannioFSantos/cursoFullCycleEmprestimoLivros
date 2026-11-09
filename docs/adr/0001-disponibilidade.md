@@ -1,126 +1,96 @@
-# ADR 0001 — Como impedir o empréstimo duplicado do último exemplar
+# ADR 0001 — Como impedir que o último exemplar seja emprestado duas vezes
 
 - **Status:** aceito
-- **Data:** 2026-11-05
-- **Decisores:** Jannio Ferreira dos Santos
-- **Contexto do curso:** Full Cycle — Módulo 4 — Projeto B
+- **Data:** 05/11/2026
+- **Autor:** Jannio Ferreira dos Santos
 
-## Contexto e problema
+## O problema
 
-A biblioteca pode ter mais de um exemplar do mesmo livro. A regra é simples:
-não é possível emprestar um livro quando `empréstimos ativos >= exemplares
-totais`.
+Um livro pode ter vários exemplares. A regra é: só empresta se
+`empréstimos ativos < exemplares totais`.
 
-O problema aparece com **duas requisições simultâneas** para o último
-exemplar. O fluxo ingênuo é:
+O jeito mais óbvio de fazer isso é:
 
-1. contar empréstimos ativos;
-2. verificar se ainda há exemplar;
+1. contar os empréstimos ativos;
+2. ver se ainda tem exemplar;
 3. inserir o empréstimo.
 
-Se as duas requisições executam o passo 1 antes de qualquer uma executar o
-passo 3, as duas veem "1 exemplar disponível" e as duas inserem. Resultado:
-dois empréstimos para um exemplar só.
+O problema é quando duas pessoas fazem isso ao mesmo tempo. As duas contam
+antes de qualquer uma inserir, as duas veem que tem 1 exemplar, e as duas
+inserem. No fim, o mesmo exemplar foi emprestado duas vezes.
 
-Esse é um problema de **corrida crítica** (race condition) e não aparece em
-teste manual. É preciso decidir onde a exclusão mútua acontece.
+Isso não acontece em teste manual, só com requisições simultâneas. Por isso
+precisa de uma decisão.
 
-## Alternativas consideradas
+## Opções que eu considerei
 
-### Alternativa A — Coluna `exemplares_disponiveis` no livro (descartada)
+**1. Guardar uma coluna `exemplares_disponiveis` no livro**
 
-Manter um contador desnormalizado, decrementando com `UPDATE ... SET
-disponiveis = disponiveis - 1 WHERE disponiveis > 0`.
+A ideia é diminuir esse número a cada empréstimo. Descartei porque vira uma
+segunda fonte de verdade: se uma devolução falhar ou alguém mexer no banco, o
+número fica errado e não tem como saber qual está certo. Além disso, ainda
+precisa de um `UPDATE` com condição para evitar a corrida.
 
-**Por que foi descartada:**
-- cria uma segunda fonte de verdade: o contador pode divergir da contagem real
-  de empréstimos (bug de devolução, importação, correção manual);
-- continua sendo necessário um `UPDATE` condicional para evitar corrida, então
-  não elimina a complexidade — apenas a esconde;
-- qualquer relatório precisa reconciliar dois números.
+**2. Usar um lock no Redis**
 
-### Alternativa B — Lock distribuído no Redis (descartada)
+Resolve, mas eu teria que adicionar Redis só para isso. Para o tamanho do
+projeto não vale a pena. Também tem casos chatos, como o lock ficar preso se
+um processo morrer.
 
-Adquirir um lock por `livroId` antes de contar.
+**3. Índice único em `livro_id` para empréstimos ativos**
 
-**Por que foi descartada:**
-- adiciona um componente de infraestrutura (Redis) para resolver um problema
-  que o banco já resolve;
-- lock distribuído tem seus próprios casos de borda (TTL, processo que morre
-  segurando o lock);
-- o volume do projeto não justifica.
+Não funciona porque impediria o segundo empréstimo mesmo quando o livro tem
+vários exemplares.
 
-### Alternativa C — Transação + `SELECT ... FOR UPDATE` (escolhida)
+**4. Transação com `SELECT ... FOR UPDATE` (escolhida)**
 
-Dentro de uma transação, travar a linha do livro antes de contar.
+Travar a linha do livro antes de contar. Enquanto uma transação está com a
+linha travada, a outra espera. Quando a primeira termina, a segunda conta de
+novo e aí sim decide.
 
-**Por que foi escolhida:**
-- o próprio PostgreSQL garante a exclusão mútua;
-- a fonte de verdade continua sendo a contagem de empréstimos;
-- não adiciona infraestrutura;
-- o custo é conhecido e mensurável: quem chega depois espera o commit de quem
-  chegou antes.
+## A decisão
 
-### Alternativa D — Constraint única parcial (descartada)
-
-Criar um índice único em `(livro_id)` para empréstimos ativos.
-
-**Por que foi descartada:** impediria **qualquer** segundo empréstimo do mesmo
-livro, mesmo quando há vários exemplares. Não modela a regra real.
-
-## Decisão
-
-Usar **transação com `SELECT ... FOR UPDATE`** na linha do livro, sempre antes
-de qualquer contagem:
+Dentro de uma transação, eu travo a linha do livro:
 
 ```sql
-BEGIN;
-SELECT id, exemplares_total FROM livros WHERE id = $1 FOR UPDATE;
--- com a linha travada, contar e validar é seguro
-SELECT count(*) FROM emprestimos WHERE livro_id = $1 AND status = 'ATIVO';
-INSERT INTO emprestimos (...) VALUES (...);
-COMMIT;
+SELECT id, exemplares_total
+FROM livros
+WHERE id = $1
+FOR UPDATE;
 ```
 
-A validação permanece no domínio, como função pura
-(`validarEmprestimo`), e o repositório apenas a invoca dentro da transação.
-Assim a regra é testável sem banco e a atomicidade fica no banco.
+Depois conto os empréstimos ativos, valido as regras e insiro. Se a validação
+falhar, a transação é desfeita e a API responde `409`.
 
-### Detalhe: ordem dos locks
+Também travo a linha do usuário, sempre **depois** do livro. Mantenho essa
+ordem em todas as transações para evitar deadlock (duas transações esperando
+uma pela outra).
 
-Também travamos a linha do usuário, sempre **depois** do livro. Manter a mesma
-ordem em todas as transações evita deadlock (duas transações esperando uma pela
-outra). O PostgreSQL detecta deadlock e aborta uma delas; evitar a situação é
-melhor do que tratar o erro.
+A validação continua em uma função pura (`validarEmprestimo`), que é a mesma
+usada nos testes unitários. O repositório só chama essa função dentro da
+transação.
 
-### Limitação assumida (e documentada)
+## O que muda com isso
 
-O limite de 3 empréstimos e o bloqueio por atraso também são checados dentro da
-mesma transação, com o usuário travado. Ainda assim, **preferimos não
-serializar todas as requisições do mesmo usuário em cenários de altíssima
-concorrência**: o lock do livro já resolve o risco crítico (último exemplar).
-Se o volume crescer, o próximo passo é um lock por usuário ou uma constraint
-de negócio mais forte — e um novo ADR.
+**Bom:**
 
-## Consequências
+- se duas pessoas pedirem o último exemplar juntas, uma recebe `201` e a outra
+  `409`;
+- não precisei adicionar Redis nem outra infraestrutura;
+- a regra continua testável sem banco.
 
-**Positivas**
-- dois pedidos simultâneos do último exemplar resultam em **um 201 e um 409**
-  (coberto pelo teste de integração e pelo teste de carga);
-- nenhuma infraestrutura extra;
-- a regra continua em uma função pura e testável.
+**Ruim:**
 
-**Negativas**
-- requisições para o **mesmo livro** são serializadas; o p95 de escrita sobe
-  sob concorrência concentrada (medido em `docs/desempenho.md`);
-- o desenvolvedor precisa conhecer transação e SQL cru para mexer nesse
-  arquivo — por isso ele está comentado linha a linha.
+- pedidos para o mesmo livro ficam em fila, um esperando o outro. No teste de
+  carga isso apareceu: a escrita ficou com p95 de 264 ms, contra 41 ms da
+  leitura. Está em `docs/desempenho.md`;
+- quem for mexer nesse arquivo precisa entender transação e SQL. Por isso
+  deixei o código bem comentado.
 
-## Como verificar
+## Como conferir
 
-1. Teste de integração: dois empréstimos do único exemplar -> segundo recebe
-   `409 LIVRO_INDISPONIVEL`.
-2. Teste de carga (`k6/load.js`): o cenário de escritas registra p95 e a
-   taxa de respostas de negócio.
-3. Logs estruturados mostram `duracaoMs` por requisição, permitindo identificar
-   se o tempo está no lock.
+- Teste de integração: dois empréstimos do único exemplar, o segundo recebe
+  `409 LIVRO_INDISPONIVEL`.
+- Teste de carga: o cenário de escrita mede o p95 nesse cenário de disputa.
+- Logs: cada requisição mostra `duracaoMs`, então dá para ver se o tempo está
+  na API ou na espera do banco.
