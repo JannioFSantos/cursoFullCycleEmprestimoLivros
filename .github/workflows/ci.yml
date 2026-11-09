@@ -1,0 +1,100 @@
+name: CI
+
+# Roda em todo push e em todo pull request para a branch main.
+# O badge no README usa este arquivo.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  qualidade:
+    name: lint + testes + build
+    runs-on: ubuntu-latest
+
+    services:
+      # Banco real e descartável, igual ao de produção.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: biblioteca
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d biblioteca"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      LOG_LEVEL: silent
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/biblioteca?schema=public
+      PRAZO_DIAS: 14
+      LIMITE_EMPRESTIMOS: 3
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      - name: Aplicar migrations
+        run: npx prisma migrate deploy
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes com cobertura
+        run: npm run test:coverage
+
+      - name: Build de produção
+        run: npm run build
+
+  contrato:
+    name: contrato OpenAPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # Falha o pipeline se o openapi.yaml ficar inválido ou fora das boas
+      # práticas (operationId duplicado, resposta sem descrição etc.).
+      - name: Lint do OpenAPI
+        run: npm run lint:openapi
+
+  imagem:
+    name: build da imagem Docker
+    runs-on: ubuntu-latest
+    needs: qualidade
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      # Prova que o Dockerfile (o mesmo usado no Coolify) builda.
+      - name: Build da imagem
+        run: docker build -t biblioteca-api:ci .

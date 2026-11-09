@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+# Scripts que rodam dentro do Linux (Docker/Coolify) precisam de LF.
+*.sh text eol=lf
+Dockerfile text eol=lf

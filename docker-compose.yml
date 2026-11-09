@@ -1,0 +1,47 @@
+# Ambiente local completo: banco + API com UM comando:
+#
+#   docker compose up --build
+#
+# A API fica em http://localhost:3000 e o banco em localhost:5432.
+# Os dados do Postgres ficam no volume "dados_postgres" (sobrevivem ao down).
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: biblioteca-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: biblioteca
+    ports:
+      # exposto só para você conseguir rodar `npm run db:deploy` da máquina
+      - '5432:5432'
+    volumes:
+      - dados_postgres:/var/lib/postgresql/data
+    healthcheck:
+      # A API só sobe depois que o banco aceita conexões.
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d biblioteca']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: biblioteca-api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+      # Dentro do Compose, o host do banco é o nome do serviço: "db".
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/biblioteca?schema=public
+      PRAZO_DIAS: 14
+      LIMITE_EMPRESTIMOS: 3
+    ports:
+      - '3000:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  dados_postgres:

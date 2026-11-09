@@ -1,0 +1,20 @@
+# Dependências e artefatos de build
+node_modules/
+dist/
+coverage/
+
+# Variáveis de ambiente reais NUNCA vão para o repositório.
+# O arquivo .env.example (sem segredos) é o que fica versionado.
+.env
+.env.*
+!.env.example
+
+# Logs e arquivos do sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
