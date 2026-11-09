@@ -36,12 +36,50 @@ async function main(): Promise<void> {
       isbn: '9780321834577',
       exemplaresTotal: 2,
     },
+    {
+      titulo: 'The Pragmatic Programmer',
+      autor: 'Andrew Hunt e David Thomas',
+      isbn: '9780201616224',
+      exemplaresTotal: 2,
+    },
+    {
+      titulo: 'Design Patterns',
+      autor: 'Erich Gamma, Richard Helm, Ralph Johnson e John Vlissides',
+      isbn: '9780201633610',
+      exemplaresTotal: 1,
+    },
+    {
+      titulo: 'Working Effectively with Legacy Code',
+      autor: 'Michael Feathers',
+      isbn: '9780131177055',
+      exemplaresTotal: 2,
+    },
+    {
+      titulo: 'Test-Driven Development',
+      autor: 'Kent Beck',
+      isbn: '9780321146533',
+      exemplaresTotal: 2,
+    },
+    {
+      titulo: 'Continuous Delivery',
+      autor: 'Jez Humble e David Farley',
+      isbn: '9780321601919',
+      exemplaresTotal: 1,
+    },
+    {
+      titulo: 'Accelerate',
+      autor: 'Nicole Forsgren, Jez Humble e Gene Kim',
+      isbn: '9781942788331',
+      exemplaresTotal: 2,
+    },
   ]
 
   const usuarios = [
     { nome: 'Ana Souza', email: 'ana@exemplo.com' },
     { nome: 'Bruno Lima', email: 'bruno@exemplo.com' },
     { nome: 'Carla Dias', email: 'carla@exemplo.com' },
+    { nome: 'Diego Alves', email: 'diego@exemplo.com' },
+    { nome: 'Elisa Martins', email: 'elisa@exemplo.com' },
   ]
 
   for (const livro of livros) {

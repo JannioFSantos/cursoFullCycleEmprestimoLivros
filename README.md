@@ -120,7 +120,7 @@ npm run dev
 | `npm run test:integration` | só teste com banco |
 | `npm run test:coverage` | testes + cobertura |
 | `npm run db:deploy` | aplica as migrations |
-| `npm run db:seed` | cadastra 4 livros e 3 usuários |
+| `npm run db:seed` | cadastra 10 livros e 5 usuários de teste |
 | `npm run db:studio` | abre o Prisma Studio |
 
 ## Como testar na mão
