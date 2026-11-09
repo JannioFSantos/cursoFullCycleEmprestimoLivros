@@ -162,7 +162,7 @@ Swagger mostra e que o CI valida com o Spectral. Se quiser o contrato em JSON,
 basta acessar `/docs/json`.
 
 Em produção fica no mesmo endereço da API:
-`https://seu-dominio.com/docs`.
+`https://agendadeconsultas.v6.rocks/docs`.
 
 ## Testes
 
@@ -323,7 +323,11 @@ O passo a passo completo está em
 2. crie a aplicação apontando para este repositório;
 3. escolha build pack **Dockerfile**;
 4. configure as variáveis de ambiente;
-5. exponha a porta `3000` e configure o domínio com HTTPS.
+5. exponha a porta `3000` e aponte o domínio
+   `agendadeconsultas.v6.rocks` com HTTPS.
+
+Em produção, a API fica em `https://agendadeconsultas.v6.rocks` e o Swagger em
+`https://agendadeconsultas.v6.rocks/docs`.
 
 Variáveis necessárias:
 

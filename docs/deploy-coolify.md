@@ -66,8 +66,7 @@ A imagem também tem um `HEALTHCHECK` no Dockerfile, que faz a mesma coisa.
 
 ## 6. Domínio
 
-Na aba **Domains**, coloque o domínio (ou use o domínio temporário do Coolify)
-e ative o **HTTPS**.
+Na aba **Domains**, coloque `agendadeconsultas.v6.rocks` e ative o **HTTPS**.
 
 ## 7. Deploy
 
@@ -85,18 +84,18 @@ falhar no deploy do que rodar uma API com o banco desatualizado.
 ## 8. Conferir se funcionou
 
 ```bash
-curl -i https://seu-dominio.com/health
+curl -i https://agendadeconsultas.v6.rocks/health
 ```
 
 Deve voltar `200` com `{"status":"ok"}`.
 
-A documentação Swagger fica em `https://seu-dominio.com/docs`. Ela lê o
+A documentação Swagger fica em `https://agendadeconsultas.v6.rocks/docs`. Ela lê o
 `docs/openapi.yaml` que vai junto na imagem Docker.
 
 Depois teste uma rota de verdade:
 
 ```bash
-curl -s -X POST https://seu-dominio.com/livros \
+curl -s -X POST https://agendadeconsultas.v6.rocks/livros \
   -H 'Content-Type: application/json' \
   -d '{"titulo":"DDD","autor":"Eric Evans","isbn":"9780321125217","exemplaresTotal":1}'
 ```

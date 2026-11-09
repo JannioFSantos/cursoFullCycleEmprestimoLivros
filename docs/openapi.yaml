@@ -27,8 +27,8 @@ servers:
     description: Mesmo servidor desta página (funciona local e em produção)
   - url: http://localhost:3000
     description: Ambiente local (docker compose)
-  - url: https://api.seu-dominio.com
-    description: Produção no Coolify (substitua pelo domínio real)
+  - url: https://agendadeconsultas.v6.rocks
+    description: Produção no Coolify
 
 tags:
   - name: Infraestrutura
