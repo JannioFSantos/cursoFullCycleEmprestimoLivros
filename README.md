@@ -1,4 +1,4 @@
-# Empréstimo de Livros — API
+# Empréstimo de Livros — API (Projeto B)
 
 **Nível: Projeto B** (Full Cycle — Módulo 4)
 
