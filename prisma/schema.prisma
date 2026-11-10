@@ -24,12 +24,14 @@ enum StatusEmprestimo {
 }
 
 model Livro {
-  id              String   @id @default(uuid()) @db.Uuid
+  id              String    @id @default(uuid()) @db.Uuid
   titulo          String
   autor           String
-  isbn            String   @unique
-  exemplaresTotal Int      @map("exemplares_total")
-  criadoEm        DateTime @default(now()) @map("criado_em")
+  isbn            String    @unique
+  exemplaresTotal Int       @map("exemplares_total")
+  criadoEm        DateTime  @default(now()) @map("criado_em")
+  /// Preenchido quando o livro sai do catálogo, mas tem empréstimos antigos.
+  excluidoEm      DateTime? @map("excluido_em")
 
   emprestimos Emprestimo[]
 
@@ -37,10 +39,12 @@ model Livro {
 }
 
 model Usuario {
-  id       String   @id @default(uuid()) @db.Uuid
-  nome     String
-  email    String   @unique
-  criadoEm DateTime @default(now()) @map("criado_em")
+  id         String    @id @default(uuid()) @db.Uuid
+  nome       String
+  email      String    @unique
+  criadoEm   DateTime  @default(now()) @map("criado_em")
+  /// Preenchido quando o usuário sai da lista, mas tem empréstimos antigos.
+  excluidoEm DateTime? @map("excluido_em")
 
   emprestimos Emprestimo[]
 

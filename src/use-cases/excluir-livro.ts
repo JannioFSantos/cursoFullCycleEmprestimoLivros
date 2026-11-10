@@ -1,17 +1,24 @@
 import type { LivroRepositorio } from '../domain/repositorios'
-import { validarExclusaoDeLivro } from '../domain/regras'
+import type { Relogio } from '../domain/relogio'
+import { relogioDoSistema } from '../domain/relogio'
 
 /**
  * Caso de uso: excluir um livro.
  *
- * Só permite excluir livro que nunca teve empréstimo. Se tivesse, apagar o
- * livro apagaria também o histórico de quem pegou. A regra fica no domínio
- * (`validarExclusaoDeLivro`) e o repositório faz a checagem + delete juntos.
+ * A regra de "apagar de verdade ou só marcar como excluído" está no domínio
+ * (`decidirModoDeExclusao`) e é aplicada pelo repositório dentro de uma
+ * transação. Livro com empréstimos sai do catálogo, mas o histórico continua
+ * aparecendo na lista de empréstimos.
+ *
+ * A data da exclusão vem do relógio injetado, igual à data de devolução.
  */
 export class ExcluirLivro {
-  constructor(private readonly livros: LivroRepositorio) {}
+  constructor(
+    private readonly livros: LivroRepositorio,
+    private readonly relogio: Relogio = relogioDoSistema,
+  ) {}
 
   async executar(id: string): Promise<void> {
-    await this.livros.excluirComBloqueio(id, validarExclusaoDeLivro)
+    await this.livros.excluir(id, this.relogio.agora())
   }
 }

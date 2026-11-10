@@ -15,7 +15,11 @@ import type {
   UsuarioRepositorio,
 } from '../../src/domain/repositorios'
 import type { EstadoParaEmprestar, EstadoParaAtualizarLivro } from '../../src/domain/regras'
-import { calcularDisponiveis, inicioDoDia } from '../../src/domain/regras'
+import {
+  calcularDisponiveis,
+  decidirModoDeExclusao,
+  inicioDoDia,
+} from '../../src/domain/regras'
 import { erros } from '../../src/domain/erros'
 
 /**
@@ -35,6 +39,7 @@ export function criarLivroFake(
     autor: 'Autor de teste',
     isbn: `isbn-${randomUUID()}`,
     criadoEm: new Date(),
+    excluidoEm: null,
     ...dados,
   }
 }
@@ -45,6 +50,7 @@ export function criarUsuarioFake(dados: Partial<Usuario> = {}): Usuario {
     nome: 'Usuário de teste',
     email: `${randomUUID()}@exemplo.com`,
     criadoEm: new Date(),
+    excluidoEm: null,
     ...dados,
   }
 }
@@ -57,21 +63,31 @@ export class LivroRepositorioFake implements LivroRepositorio {
   emprestimosRegistrados = 0
 
   async criar(dados: DadosNovoLivro): Promise<Livro> {
-    const livro: Livro = { id: randomUUID(), criadoEm: new Date(), ...dados }
+    const livro: Livro = {
+      id: randomUUID(),
+      criadoEm: new Date(),
+      excluidoEm: null,
+      ...dados,
+    }
     this.livros.push(livro)
     return livro
   }
 
   async buscarPorId(id: string): Promise<Livro | null> {
-    return this.livros.find((livro) => livro.id === id) ?? null
+    return (
+      this.livros.find((livro) => livro.id === id && livro.excluidoEm === null) ??
+      null
+    )
   }
 
   async listarComDisponibilidade(): Promise<LivroComDisponibilidade[]> {
-    return this.livros.map((livro) => ({
-      ...livro,
-      emprestimosAtivos: 0,
-      exemplaresDisponiveis: calcularDisponiveis(livro.exemplaresTotal, 0),
-    }))
+    return this.livros
+      .filter((livro) => livro.excluidoEm === null)
+      .map((livro) => ({
+        ...livro,
+        emprestimosAtivos: 0,
+        exemplaresDisponiveis: calcularDisponiveis(livro.exemplaresTotal, 0),
+      }))
   }
 
   async atualizarComBloqueio(
@@ -91,15 +107,19 @@ export class LivroRepositorioFake implements LivroRepositorio {
     return livro
   }
 
-  async excluirComBloqueio(
-    id: string,
-    validar: (emprestimosRegistrados: number) => void,
-  ): Promise<void> {
-    const indice = this.livros.findIndex((livro) => livro.id === id)
+  async excluir(id: string, quando: Date): Promise<void> {
+    const indice = this.livros.findIndex(
+      (livro) => livro.id === id && livro.excluidoEm === null,
+    )
     if (indice < 0) throw erros.livroNaoEncontrado()
 
-    validar(this.emprestimosRegistrados)
-    this.livros.splice(indice, 1)
+    // Mesma decisão do domínio usada pela implementação Prisma.
+    if (decidirModoDeExclusao(this.emprestimosRegistrados) === 'APAGAR') {
+      this.livros.splice(indice, 1)
+      return
+    }
+
+    this.livros[indice].excluidoEm = quando
   }
 }
 
@@ -110,17 +130,28 @@ export class UsuarioRepositorioFake implements UsuarioRepositorio {
   emprestimosRegistrados = 0
 
   async criar(dados: DadosNovoUsuario): Promise<Usuario> {
-    const usuario: Usuario = { id: randomUUID(), criadoEm: new Date(), ...dados }
+    const usuario: Usuario = {
+      id: randomUUID(),
+      criadoEm: new Date(),
+      excluidoEm: null,
+      ...dados,
+    }
     this.usuarios.push(usuario)
     return usuario
   }
 
   async buscarPorId(id: string): Promise<Usuario | null> {
-    return this.usuarios.find((usuario) => usuario.id === id) ?? null
+    return (
+      this.usuarios.find(
+        (usuario) => usuario.id === id && usuario.excluidoEm === null,
+      ) ?? null
+    )
   }
 
   async listar(): Promise<Usuario[]> {
-    return [...this.usuarios].sort((a, b) => a.nome.localeCompare(b.nome))
+    return this.usuarios
+      .filter((usuario) => usuario.excluidoEm === null)
+      .sort((a, b) => a.nome.localeCompare(b.nome))
   }
 
   async atualizar(id: string, dados: DadosNovoUsuario): Promise<Usuario> {
@@ -131,15 +162,18 @@ export class UsuarioRepositorioFake implements UsuarioRepositorio {
     return usuario
   }
 
-  async excluirComBloqueio(
-    id: string,
-    validar: (emprestimosRegistrados: number) => void,
-  ): Promise<void> {
-    const indice = this.usuarios.findIndex((usuario) => usuario.id === id)
+  async excluir(id: string, quando: Date): Promise<void> {
+    const indice = this.usuarios.findIndex(
+      (usuario) => usuario.id === id && usuario.excluidoEm === null,
+    )
     if (indice < 0) throw erros.usuarioNaoEncontrado()
 
-    validar(this.emprestimosRegistrados)
-    this.usuarios.splice(indice, 1)
+    if (decidirModoDeExclusao(this.emprestimosRegistrados) === 'APAGAR') {
+      this.usuarios.splice(indice, 1)
+      return
+    }
+
+    this.usuarios[indice].excluidoEm = quando
   }
 }
 
@@ -221,14 +255,30 @@ export class EmprestimoRepositorioFake implements EmprestimoRepositorio {
       if (emprestimo.status !== 'ATIVO') continue
       if (inicioDoDia(emprestimo.dataPrevista) >= inicioDoDia(hoje)) continue
 
-      const livro = await this.livros.buscarPorId(emprestimo.livroId)
-      const usuario = await this.usuarios.buscarPorId(emprestimo.usuarioId)
+      // Aqui a busca é direto na lista, sem filtrar `excluidoEm`: o histórico
+      // precisa continuar aparecendo mesmo para livro/usuário excluídos.
+      const livro = this.livros.livros.find(
+        (item) => item.id === emprestimo.livroId,
+      )
+      const usuario = this.usuarios.usuarios.find(
+        (item) => item.id === emprestimo.usuarioId,
+      )
       if (!livro || !usuario) continue
 
       detalhados.push({
         ...emprestimo,
-        livro: { id: livro.id, titulo: livro.titulo, autor: livro.autor },
-        usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email },
+        livro: {
+          id: livro.id,
+          titulo: livro.titulo,
+          autor: livro.autor,
+          excluidoEm: livro.excluidoEm,
+        },
+        usuario: {
+          id: usuario.id,
+          nome: usuario.nome,
+          email: usuario.email,
+          excluidoEm: usuario.excluidoEm,
+        },
       })
     }
 
@@ -239,14 +289,28 @@ export class EmprestimoRepositorioFake implements EmprestimoRepositorio {
     const detalhados: EmprestimoDetalhado[] = []
 
     for (const emprestimo of this.emprestimos) {
-      const livro = await this.livros.buscarPorId(emprestimo.livroId)
-      const usuario = await this.usuarios.buscarPorId(emprestimo.usuarioId)
+      const livro = this.livros.livros.find(
+        (item) => item.id === emprestimo.livroId,
+      )
+      const usuario = this.usuarios.usuarios.find(
+        (item) => item.id === emprestimo.usuarioId,
+      )
       if (!livro || !usuario) continue
 
       detalhados.push({
         ...emprestimo,
-        livro: { id: livro.id, titulo: livro.titulo, autor: livro.autor },
-        usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email },
+        livro: {
+          id: livro.id,
+          titulo: livro.titulo,
+          autor: livro.autor,
+          excluidoEm: livro.excluidoEm,
+        },
+        usuario: {
+          id: usuario.id,
+          nome: usuario.nome,
+          email: usuario.email,
+          excluidoEm: usuario.excluidoEm,
+        },
       })
     }
 

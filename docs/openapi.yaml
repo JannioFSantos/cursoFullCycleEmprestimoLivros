@@ -17,7 +17,9 @@ info:
     - só empresta se houver exemplar disponível;
     - usuário com empréstimo atrasado não pega livro novo;
     - máximo de 3 empréstimos ativos por usuário;
-    - prazo padrão de 14 dias (configurável por `PRAZO_DIAS`).
+    - prazo padrão de 14 dias (configurável por `PRAZO_DIAS`);
+    - excluir livro/usuário com histórico não apaga o histórico: o cadastro
+      sai das listas e o empréstimo antigo continua aparecendo.
   contact:
     name: Jannio Ferreira dos Santos
     url: https://github.com/JannioFSantos/cursoFullCycleEmprestimoLivros
@@ -148,8 +150,10 @@ paths:
       operationId: excluirLivro
       summary: Exclui um livro
       description: |
-        Só exclui livro que nunca teve empréstimo. Livro com histórico responde
-        409 `LIVRO_COM_EMPRESTIMOS`, para não apagar quem pegou o livro.
+        Tira o livro do catálogo. Se ele nunca teve empréstimo, a linha é
+        apagada. Se já teve, a linha é preservada e apenas marcada com
+        `excluidoEm`, para o histórico continuar mostrando qual livro foi
+        emprestado. Depois da exclusão, o livro não pode mais ser emprestado.
       parameters:
         - $ref: '#/components/parameters/IdDoRecurso'
       responses:
@@ -157,8 +161,6 @@ paths:
           description: Livro excluído
         '404':
           $ref: '#/components/responses/NaoEncontrado'
-        '409':
-          $ref: '#/components/responses/Conflito'
 
   /usuarios:
     get:
@@ -250,8 +252,10 @@ paths:
       operationId: excluirUsuario
       summary: Exclui um usuário
       description: |
-        Só exclui usuário que nunca pegou livro. Usuário com histórico responde
-        409 `USUARIO_COM_EMPRESTIMOS`, para não apagar o histórico.
+        Tira o usuário da lista. Se ele nunca pegou livro, a linha é apagada.
+        Se já pegou, a linha é preservada e apenas marcada com `excluidoEm`,
+        para o histórico continuar mostrando quem pegou o livro. Depois da
+        exclusão, o usuário não pode mais pegar livro novo.
       parameters:
         - $ref: '#/components/parameters/IdDoRecurso'
       responses:
@@ -259,8 +263,6 @@ paths:
           description: Usuário excluído
         '404':
           $ref: '#/components/responses/NaoEncontrado'
-        '409':
-          $ref: '#/components/responses/Conflito'
 
   /emprestimos:
     get:
@@ -417,7 +419,7 @@ components:
 
     Livro:
       type: object
-      required: [id, titulo, autor, isbn, exemplaresTotal, criadoEm]
+      required: [id, titulo, autor, isbn, exemplaresTotal, criadoEm, excluidoEm]
       properties:
         id:
           type: string
@@ -433,11 +435,15 @@ components:
         criadoEm:
           type: string
           format: date-time
+        excluidoEm:
+          type: [string, 'null']
+          format: date-time
+          description: null enquanto o livro está no catálogo.
 
     LivroComDisponibilidade:
       type: object
       required:
-        [id, titulo, autor, isbn, exemplaresTotal, emprestimosAtivos, exemplaresDisponiveis]
+        [id, titulo, autor, isbn, exemplaresTotal, criadoEm, excluidoEm, emprestimosAtivos, exemplaresDisponiveis]
       properties:
         id:
           type: string
@@ -450,6 +456,12 @@ components:
           type: string
         exemplaresTotal:
           type: integer
+        criadoEm:
+          type: string
+          format: date-time
+        excluidoEm:
+          type: [string, 'null']
+          format: date-time
         emprestimosAtivos:
           type: integer
         exemplaresDisponiveis:
@@ -473,7 +485,7 @@ components:
 
     Usuario:
       type: object
-      required: [id, nome, email, criadoEm]
+      required: [id, nome, email, criadoEm, excluidoEm]
       properties:
         id:
           type: string
@@ -486,6 +498,10 @@ components:
         criadoEm:
           type: string
           format: date-time
+        excluidoEm:
+          type: [string, 'null']
+          format: date-time
+          description: null enquanto o usuário está na lista.
 
     NovoEmprestimo:
       type: object
@@ -555,7 +571,7 @@ components:
           format: date-time
         livro:
           type: object
-          required: [id, titulo, autor]
+          required: [id, titulo, autor, excluidoEm]
           properties:
             id:
               type: string
@@ -564,9 +580,13 @@ components:
               type: string
             autor:
               type: string
+            excluidoEm:
+              type: [string, 'null']
+              format: date-time
+              description: Preenchido quando o livro saiu do catálogo.
         usuario:
           type: object
-          required: [id, nome, email]
+          required: [id, nome, email, excluidoEm]
           properties:
             id:
               type: string
@@ -576,6 +596,10 @@ components:
             email:
               type: string
               format: email
+            excluidoEm:
+              type: [string, 'null']
+              format: date-time
+              description: Preenchido quando o usuário saiu da lista.
 
     Erro:
       type: object

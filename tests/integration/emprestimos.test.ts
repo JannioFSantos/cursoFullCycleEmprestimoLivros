@@ -349,7 +349,7 @@ describe('API de empréstimos (integração)', () => {
     })
   })
 
-  it('exclui livro sem empréstimos e recusa livro com histórico', async () => {
+  it('exclui livro sem empréstimos e preserva o histórico do livro com empréstimo', async () => {
     const semEmprestimo = await criarLivro(1)
 
     const excluido = await app.inject({
@@ -367,15 +367,59 @@ describe('API de empréstimos (integração)', () => {
     const usuario = await criarUsuario()
     await emprestar(comEmprestimo.id, usuario.id)
 
-    const recusado = await app.inject({
+    // Mesmo com histórico, a exclusão dá 204: o livro sai do catálogo e a
+    // linha continua no banco para o histórico não ser perdido.
+    const preservado = await app.inject({
       method: 'DELETE',
       url: `/API/livros/${comEmprestimo.id}`,
     })
+    expect(preservado.statusCode).toBe(204)
 
-    expect(recusado.statusCode).toBe(409)
-    expect(recusado.json()).toMatchObject({
-      erro: { codigo: 'LIVRO_COM_EMPRESTIMOS' },
+    const catalogo = await app.inject({ method: 'GET', url: '/API/livros' })
+    expect(catalogo.json().itens.map((item: { id: string }) => item.id)).not.toContain(
+      comEmprestimo.id,
+    )
+
+    // O empréstimo continua listado, com o livro marcado como excluído.
+    const emprestimos = await app.inject({
+      method: 'GET',
+      url: '/API/emprestimos',
     })
+    const historico = emprestimos
+      .json()
+      .itens.find(
+        (item: { livro: { id: string } }) => item.livro.id === comEmprestimo.id,
+      )
+    expect(historico).toMatchObject({
+      livro: { id: comEmprestimo.id, titulo: comEmprestimo.titulo },
+    })
+    expect(historico.livro.excluidoEm).not.toBeNull()
+
+    // Livro excluído não recebe empréstimo novo e não pode ser editado de novo.
+    const outroUsuario = await criarUsuario()
+    const novoEmprestimo = await emprestar(comEmprestimo.id, outroUsuario.id)
+    expect(novoEmprestimo.statusCode).toBe(404)
+    expect(novoEmprestimo.json()).toMatchObject({
+      erro: { codigo: 'LIVRO_NAO_ENCONTRADO' },
+    })
+
+    const editarExcluido = await app.inject({
+      method: 'PUT',
+      url: `/API/livros/${comEmprestimo.id}`,
+      payload: {
+        titulo: 'Tentativa',
+        autor: 'Autor',
+        isbn: '9780000005555',
+        exemplaresTotal: 1,
+      },
+    })
+    expect(editarExcluido.statusCode).toBe(404)
+
+    const excluirDeNovo = await app.inject({
+      method: 'DELETE',
+      url: `/API/livros/${comEmprestimo.id}`,
+    })
+    expect(excluirDeNovo.statusCode).toBe(404)
   })
 
   it('edita um usuário com PUT', async () => {
@@ -395,7 +439,7 @@ describe('API de empréstimos (integração)', () => {
     })
   })
 
-  it('exclui usuário sem empréstimos e recusa usuário com histórico', async () => {
+  it('exclui usuário sem empréstimos e preserva o histórico do usuário com empréstimo', async () => {
     const semEmprestimo = await criarUsuario()
 
     const excluido = await app.inject({
@@ -413,15 +457,60 @@ describe('API de empréstimos (integração)', () => {
     const comEmprestimo = await criarUsuario()
     await emprestar(livro.id, comEmprestimo.id)
 
-    const recusado = await app.inject({
+    const preservado = await app.inject({
       method: 'DELETE',
       url: `/API/usuarios/${comEmprestimo.id}`,
     })
+    expect(preservado.statusCode).toBe(204)
 
-    expect(recusado.statusCode).toBe(409)
-    expect(recusado.json()).toMatchObject({
-      erro: { codigo: 'USUARIO_COM_EMPRESTIMOS' },
+    const usuarios = await app.inject({ method: 'GET', url: '/API/usuarios' })
+    expect(usuarios.json().itens.map((item: { id: string }) => item.id)).not.toContain(
+      comEmprestimo.id,
+    )
+
+    // Buscar pelo id também passa a dar 404.
+    const busca = await app.inject({
+      method: 'GET',
+      url: `/API/usuarios/${comEmprestimo.id}`,
     })
+    expect(busca.statusCode).toBe(404)
+
+    // O histórico continua com o nome de quem pegou o livro.
+    const emprestimos = await app.inject({
+      method: 'GET',
+      url: '/API/emprestimos',
+    })
+    const historico = emprestimos
+      .json()
+      .itens.find(
+        (item: { usuario: { id: string } }) =>
+          item.usuario.id === comEmprestimo.id,
+      )
+    expect(historico).toMatchObject({
+      usuario: { id: comEmprestimo.id, nome: comEmprestimo.nome },
+    })
+    expect(historico.usuario.excluidoEm).not.toBeNull()
+
+    // Usuário excluído não pega livro novo e não pode ser editado de novo.
+    const outroLivro = await criarLivro(1)
+    const novoEmprestimo = await emprestar(outroLivro.id, comEmprestimo.id)
+    expect(novoEmprestimo.statusCode).toBe(404)
+    expect(novoEmprestimo.json()).toMatchObject({
+      erro: { codigo: 'USUARIO_NAO_ENCONTRADO' },
+    })
+
+    const editarExcluido = await app.inject({
+      method: 'PUT',
+      url: `/API/usuarios/${comEmprestimo.id}`,
+      payload: { nome: 'Tentativa', email: 'tentativa@exemplo.com' },
+    })
+    expect(editarExcluido.statusCode).toBe(404)
+
+    const excluirDeNovo = await app.inject({
+      method: 'DELETE',
+      url: `/API/usuarios/${comEmprestimo.id}`,
+    })
+    expect(excluirDeNovo.statusCode).toBe(404)
   })
 
   it('retorna 404 ao editar ou excluir recurso inexistente', async () => {

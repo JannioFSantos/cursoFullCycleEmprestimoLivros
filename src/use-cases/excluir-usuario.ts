@@ -1,16 +1,21 @@
 import type { UsuarioRepositorio } from '../domain/repositorios'
-import { validarExclusaoDeUsuario } from '../domain/regras'
+import type { Relogio } from '../domain/relogio'
+import { relogioDoSistema } from '../domain/relogio'
 
 /**
  * Caso de uso: excluir um usuário.
  *
- * Mesma proteção do livro: usuário que já pegou algum livro não é apagado,
- * porque isso apagaria o histórico de empréstimos dele.
+ * Mesma proteção do livro: se já existe empréstimo, o usuário não é apagado
+ * do banco. Ele só sai da lista, e o histórico continua mostrando quem pegou
+ * cada livro.
  */
 export class ExcluirUsuario {
-  constructor(private readonly usuarios: UsuarioRepositorio) {}
+  constructor(
+    private readonly usuarios: UsuarioRepositorio,
+    private readonly relogio: Relogio = relogioDoSistema,
+  ) {}
 
   async executar(id: string): Promise<void> {
-    await this.usuarios.excluirComBloqueio(id, validarExclusaoDeUsuario)
+    await this.usuarios.excluir(id, this.relogio.agora())
   }
 }

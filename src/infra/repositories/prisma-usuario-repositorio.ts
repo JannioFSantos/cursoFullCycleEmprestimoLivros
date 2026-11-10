@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client'
 import type { DadosNovoUsuario, UsuarioRepositorio } from '../../domain/repositorios'
 import type { Usuario } from '../../domain/entidades'
+import { decidirModoDeExclusao } from '../../domain/regras'
 import { erros } from '../../domain/erros'
 
 /** Implementação do UsuarioRepositorio com Prisma. */
@@ -11,31 +12,48 @@ export class PrismaUsuarioRepositorio implements UsuarioRepositorio {
     return this.prisma.usuario.create({ data: dados })
   }
 
+  /** Usuário marcado como excluído não é mais encontrado (nem pode pegar livro). */
   async buscarPorId(id: string): Promise<Usuario | null> {
-    return this.prisma.usuario.findUnique({ where: { id } })
+    return this.prisma.usuario.findFirst({
+      where: { id, excluidoEm: null },
+    })
   }
 
   async listar(): Promise<Usuario[]> {
-    return this.prisma.usuario.findMany({ orderBy: { nome: 'asc' } })
+    return this.prisma.usuario.findMany({
+      // Usuários excluídos continuam no banco por causa do histórico, mas não
+      // aparecem na lista.
+      where: { excluidoEm: null },
+      orderBy: { nome: 'asc' },
+    })
   }
 
   async atualizar(id: string, dados: DadosNovoUsuario): Promise<Usuario> {
-    return this.prisma.usuario.update({ where: { id }, data: dados })
+    // updateMany com `excluidoEm: null` evita editar um usuário que acabou de
+    // ser excluído por outra requisição.
+    const resultado = await this.prisma.usuario.updateMany({
+      where: { id, excluidoEm: null },
+      data: dados,
+    })
+
+    if (resultado.count === 0) throw erros.usuarioNaoEncontrado()
+
+    return this.prisma.usuario.findUniqueOrThrow({ where: { id } })
   }
 
   /**
-   * Exclui o usuário somente se ele nunca tiver pegado um livro.
-   * A transação trava a linha do usuário e conta os empréstimos antes.
+   * Exclui o usuário com a linha travada.
+   *
+   * Sem empréstimos: apaga de verdade.
+   * Com empréstimos: só grava `excluidoEm`, para o histórico continuar
+   * mostrando quem pegou cada livro. A decisão vem do domínio.
    */
-  async excluirComBloqueio(
-    id: string,
-    validar: (emprestimosRegistrados: number) => void,
-  ): Promise<void> {
+  async excluir(id: string, quando: Date): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const linhas = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id
         FROM usuarios
-        WHERE id = ${id}::uuid
+        WHERE id = ${id}::uuid AND excluido_em IS NULL
         FOR UPDATE
       `
 
@@ -45,9 +63,15 @@ export class PrismaUsuarioRepositorio implements UsuarioRepositorio {
         where: { usuarioId: id },
       })
 
-      validar(emprestimosRegistrados)
+      if (decidirModoDeExclusao(emprestimosRegistrados) === 'APAGAR') {
+        await tx.usuario.delete({ where: { id } })
+        return
+      }
 
-      await tx.usuario.delete({ where: { id } })
+      await tx.usuario.update({
+        where: { id },
+        data: { excluidoEm: quando },
+      })
     })
   }
 }

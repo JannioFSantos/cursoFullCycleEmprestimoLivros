@@ -5,7 +5,7 @@ import type {
 } from '../../domain/repositorios'
 import type { Livro, LivroComDisponibilidade } from '../../domain/entidades'
 import type { EstadoParaAtualizarLivro } from '../../domain/regras'
-import { calcularDisponiveis } from '../../domain/regras'
+import { calcularDisponiveis, decidirModoDeExclusao } from '../../domain/regras'
 import { erros } from '../../domain/erros'
 
 /**
@@ -22,8 +22,14 @@ export class PrismaLivroRepositorio implements LivroRepositorio {
     return this.prisma.livro.create({ data: dados })
   }
 
+  /**
+   * Livro marcado como excluído não conta mais como "encontrado".
+   * Assim ele sai do catálogo e não pode receber empréstimo novo.
+   */
   async buscarPorId(id: string): Promise<Livro | null> {
-    return this.prisma.livro.findUnique({ where: { id } })
+    return this.prisma.livro.findFirst({
+      where: { id, excluidoEm: null },
+    })
   }
 
   /**
@@ -34,6 +40,9 @@ export class PrismaLivroRepositorio implements LivroRepositorio {
    */
   async listarComDisponibilidade(): Promise<LivroComDisponibilidade[]> {
     const livros = await this.prisma.livro.findMany({
+      // Livros excluídos continuam no banco por causa do histórico, mas não
+      // aparecem no catálogo.
+      where: { excluidoEm: null },
       orderBy: { titulo: 'asc' },
       include: {
         _count: {
@@ -69,7 +78,7 @@ export class PrismaLivroRepositorio implements LivroRepositorio {
       const linhas = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id
         FROM livros
-        WHERE id = ${id}::uuid
+        WHERE id = ${id}::uuid AND excluido_em IS NULL
         FOR UPDATE
       `
 
@@ -87,18 +96,21 @@ export class PrismaLivroRepositorio implements LivroRepositorio {
   }
 
   /**
-   * Exclui o livro somente se não houver nenhum empréstimo ligado a ele.
-   * A checagem e o delete acontecem na mesma transação, com a linha travada.
+   * Exclui o livro com a linha travada.
+   *
+   * Se ele nunca teve empréstimo, apaga de verdade.
+   * Se já teve, NÃO apaga: grava `excluidoEm`. O histórico de empréstimos
+   * continua existindo e mostrando de qual livro se trata.
+   *
+   * A decisão é da função pura `decidirModoDeExclusao` (domínio), que também
+   * é testada nos testes unitários.
    */
-  async excluirComBloqueio(
-    id: string,
-    validar: (emprestimosRegistrados: number) => void,
-  ): Promise<void> {
+  async excluir(id: string, quando: Date): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const linhas = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id
         FROM livros
-        WHERE id = ${id}::uuid
+        WHERE id = ${id}::uuid AND excluido_em IS NULL
         FOR UPDATE
       `
 
@@ -108,9 +120,15 @@ export class PrismaLivroRepositorio implements LivroRepositorio {
         where: { livroId: id },
       })
 
-      validar(emprestimosRegistrados)
+      if (decidirModoDeExclusao(emprestimosRegistrados) === 'APAGAR') {
+        await tx.livro.delete({ where: { id } })
+        return
+      }
 
-      await tx.livro.delete({ where: { id } })
+      await tx.livro.update({
+        where: { id },
+        data: { excluidoEm: quando },
+      })
     })
   }
 }

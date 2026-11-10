@@ -40,7 +40,7 @@ export class PrismaEmprestimoRepositorio implements EmprestimoRepositorio {
         >`
           SELECT id, exemplares_total
           FROM livros
-          WHERE id = ${dados.livroId}::uuid
+          WHERE id = ${dados.livroId}::uuid AND excluido_em IS NULL
           FOR UPDATE
         `
 
@@ -54,7 +54,7 @@ export class PrismaEmprestimoRepositorio implements EmprestimoRepositorio {
         const usuarios = await tx.$queryRaw<Array<{ id: string }>>`
           SELECT id
           FROM usuarios
-          WHERE id = ${dados.usuarioId}::uuid
+          WHERE id = ${dados.usuarioId}::uuid AND excluido_em IS NULL
           FOR UPDATE
         `
 
@@ -134,8 +134,13 @@ export class PrismaEmprestimoRepositorio implements EmprestimoRepositorio {
       },
       orderBy: { dataPrevista: 'asc' },
       include: {
-        livro: { select: { id: true, titulo: true, autor: true } },
-        usuario: { select: { id: true, nome: true, email: true } },
+        // `excluidoEm` vem junto para a tela marcar livro/usuário removidos.
+        livro: {
+          select: { id: true, titulo: true, autor: true, excluidoEm: true },
+        },
+        usuario: {
+          select: { id: true, nome: true, email: true, excluidoEm: true },
+        },
       },
     })
   }
@@ -143,13 +148,20 @@ export class PrismaEmprestimoRepositorio implements EmprestimoRepositorio {
   /**
    * Lista todos os empréstimos com livro e usuário juntos.
    * A tela de demonstração usa isso para mostrar "quem pegou qual livro".
+   *
+   * Livro/usuário excluídos continuam aparecendo aqui: é exatamente o
+   * histórico que a exclusão lógica preserva.
    */
   async listarDetalhados(): Promise<EmprestimoDetalhado[]> {
     return this.prisma.emprestimo.findMany({
       orderBy: { dataEmprestimo: 'desc' },
       include: {
-        livro: { select: { id: true, titulo: true, autor: true } },
-        usuario: { select: { id: true, nome: true, email: true } },
+        livro: {
+          select: { id: true, titulo: true, autor: true, excluidoEm: true },
+        },
+        usuario: {
+          select: { id: true, nome: true, email: true, excluidoEm: true },
+        },
       },
     })
   }

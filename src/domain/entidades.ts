@@ -18,6 +18,12 @@ export interface Livro {
   /** Quantos exemplares físicos a biblioteca possui. */
   exemplaresTotal: number
   criadoEm: Date
+  /**
+   * null = livro no catálogo.
+   * Preenchido = livro que saiu do catálogo, mas tem histórico de empréstimo.
+   * Nesse caso a linha continua no banco para o histórico não ser perdido.
+   */
+  excluidoEm: Date | null
 }
 
 export interface Usuario {
@@ -25,6 +31,8 @@ export interface Usuario {
   nome: string
   email: string
   criadoEm: Date
+  /** Mesma ideia do livro: preenchido quando saiu da lista, mas tem histórico. */
+  excluidoEm: Date | null
 }
 
 export interface Emprestimo {
@@ -44,8 +52,8 @@ export interface Emprestimo {
  * Usado na listagem de atrasados, que precisa mostrar "quem" e "qual livro".
  */
 export interface EmprestimoDetalhado extends Emprestimo {
-  livro: Pick<Livro, 'id' | 'titulo' | 'autor'>
-  usuario: Pick<Usuario, 'id' | 'nome' | 'email'>
+  livro: Pick<Livro, 'id' | 'titulo' | 'autor' | 'excluidoEm'>
+  usuario: Pick<Usuario, 'id' | 'nome' | 'email' | 'excluidoEm'>
 }
 
 /**

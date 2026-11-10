@@ -51,11 +51,11 @@ export interface LivroRepositorio {
     validar: (estado: EstadoParaAtualizarLivro) => void,
   ): Promise<Livro>
 
-  /** Exclui o livro se `validar` aceitar. Recebe o total de empréstimos. */
-  excluirComBloqueio(
-    id: string,
-    validar: (emprestimosRegistrados: number) => void,
-  ): Promise<void>
+  /**
+   * Exclui o livro. Se ele tiver empréstimos, não apaga a linha: só grava
+   * `excluidoEm` para preservar o histórico. `quando` vem do relógio injetado.
+   */
+  excluir(id: string, quando: Date): Promise<void>
 }
 
 export interface UsuarioRepositorio {
@@ -64,11 +64,11 @@ export interface UsuarioRepositorio {
   /** Lista todos os usuários em ordem alfabética (usado na tela e na API). */
   listar(): Promise<Usuario[]>
   atualizar(id: string, dados: DadosNovoUsuario): Promise<Usuario>
-  /** Exclui o usuário se `validar` aceitar. Recebe o total de empréstimos. */
-  excluirComBloqueio(
-    id: string,
-    validar: (emprestimosRegistrados: number) => void,
-  ): Promise<void>
+  /**
+   * Exclui o usuário. Se ele tiver empréstimos, só marca `excluidoEm`, para o
+   * histórico continuar mostrando quem pegou o livro.
+   */
+  excluir(id: string, quando: Date): Promise<void>
 }
 
 export interface EmprestimoRepositorio {

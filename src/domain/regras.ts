@@ -88,22 +88,22 @@ export function validarAtualizacaoDeLivro(estado: EstadoParaAtualizarLivro): voi
   }
 }
 
-/**
- * Livro com qualquer empréstimo (ativo ou devolvido) não pode ser excluído.
- * Escolhi bloquear com histórico também para não apagar o passado: o
- * empréstimo é um registro que a biblioteca precisa guardar.
- */
-export function validarExclusaoDeLivro(emprestimosRegistrados: number): void {
-  if (emprestimosRegistrados > 0) {
-    throw erros.livroComEmprestimos(emprestimosRegistrados)
-  }
-}
+/** Maneiras de excluir um cadastro. */
+export type ModoDeExclusao = 'APAGAR' | 'MANTER_HISTORICO'
 
-/** Mesma ideia da exclusão de livro: usuário com histórico não é apagado. */
-export function validarExclusaoDeUsuario(emprestimosRegistrados: number): void {
-  if (emprestimosRegistrados > 0) {
-    throw erros.usuarioComEmprestimos(emprestimosRegistrados)
-  }
+/**
+ * Decide o que fazer ao excluir livro ou usuário.
+ *
+ * Sem empréstimos: apaga a linha de verdade (não há histórico para guardar).
+ * Com empréstimos: NÃO apaga. Só marca `excluidoEm`, para o histórico
+ * continuar mostrando qual livro/usuário participou do empréstimo.
+ *
+ * A regra é pura de propósito: dá para testar sem banco.
+ */
+export function decidirModoDeExclusao(
+  emprestimosRegistrados: number,
+): ModoDeExclusao {
+  return emprestimosRegistrados > 0 ? 'MANTER_HISTORICO' : 'APAGAR'
 }
 
 /**

@@ -251,6 +251,15 @@
         font-size: 0.8rem;
       }
 
+      .botao.perigo {
+        background: var(--vermelho);
+      }
+
+      .acoes-tabela {
+        display: flex;
+        gap: 6px;
+      }
+
       .botao:disabled {
         opacity: 0.5;
         cursor: not-allowed;
@@ -321,6 +330,45 @@
       .etiqueta.esgotado {
         background: var(--amarelo-claro);
         color: var(--amarelo);
+      }
+
+      .etiqueta.removido {
+        background: #eceff3;
+        color: var(--texto-fraco);
+      }
+
+      dialog {
+        border: none;
+        border-radius: 14px;
+        padding: 0;
+        width: min(540px, calc(100vw - 32px));
+        box-shadow: 0 18px 60px #00000055;
+      }
+
+      dialog::backdrop {
+        background: #00000066;
+      }
+
+      .dialogo-conteudo {
+        padding: 22px;
+      }
+
+      .dialogo-conteudo h2 {
+        margin: 0 0 4px;
+        color: var(--azul);
+      }
+
+      .dialogo-conteudo .ajuda {
+        margin: 0 0 16px;
+        color: var(--texto-fraco);
+        font-size: 0.9rem;
+      }
+
+      .dialogo-acoes {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
       }
 
       .passos {
@@ -508,7 +556,9 @@
           <h2>Catálogo</h2>
           <p class="ajuda">
             A disponibilidade é calculada pela API: exemplares totais menos os
-            empréstimos ativos.
+            empréstimos ativos. Use <em>Editar</em> para alterar e
+            <em>Excluir</em> para tirar do catálogo. Livro com empréstimo pede
+            confirmação, porque o histórico é preservado.
           </p>
           <div class="tabela-area">
             <table>
@@ -520,6 +570,7 @@
                   <th>Total</th>
                   <th>Emprestados</th>
                   <th>Disponíveis</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody id="tabela-livros"></tbody>
@@ -554,7 +605,12 @@
 
         <div class="painel">
           <h2>Usuários cadastrados</h2>
-          <p class="ajuda">A coluna "Empréstimos ativos" conta os livros em mãos.</p>
+          <p class="ajuda">
+            A coluna "Empréstimos ativos" conta os livros em mãos. Use
+            <em>Editar</em> para mudar nome/e-mail e <em>Excluir</em> para tirar
+            da lista. Usuário com empréstimo pede confirmação, porque o
+            histórico é preservado.
+          </p>
           <div class="tabela-area">
             <table>
               <thead>
@@ -563,6 +619,7 @@
                   <th>E-mail</th>
                   <th>Empréstimos ativos</th>
                   <th>Cadastro</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody id="tabela-usuarios"></tbody>
@@ -650,6 +707,84 @@
     </footer>
 
     <div class="aviso" id="aviso" role="status"></div>
+
+    <!-- -------------------------- EDITAR LIVRO --------------------------- -->
+    <dialog id="dialogo-livro">
+      <form class="dialogo-conteudo" id="form-editar-livro">
+        <h2>Editar livro</h2>
+        <p class="ajuda">Altere os dados e salve. O ISBN continua único.</p>
+
+        <input type="hidden" id="editar-livro-id" />
+
+        <div class="formulario">
+          <div class="campo">
+            <label for="editar-livro-titulo">Título</label>
+            <input id="editar-livro-titulo" required maxlength="200" />
+          </div>
+          <div class="campo">
+            <label for="editar-livro-autor">Autor</label>
+            <input id="editar-livro-autor" required maxlength="200" />
+          </div>
+          <div class="campo">
+            <label for="editar-livro-isbn">ISBN</label>
+            <input id="editar-livro-isbn" required minlength="10" maxlength="20" />
+          </div>
+          <div class="campo">
+            <label for="editar-livro-exemplares">Exemplares</label>
+            <input
+              id="editar-livro-exemplares"
+              type="number"
+              min="1"
+              max="10000"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="dialogo-acoes">
+          <button
+            type="button"
+            class="botao secundario"
+            data-fechar-dialogo="dialogo-livro"
+          >
+            Cancelar
+          </button>
+          <button type="submit" class="botao">Salvar alterações</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- ------------------------- EDITAR USUÁRIO -------------------------- -->
+    <dialog id="dialogo-usuario">
+      <form class="dialogo-conteudo" id="form-editar-usuario">
+        <h2>Editar usuário</h2>
+        <p class="ajuda">Altere nome e e-mail. O e-mail continua único.</p>
+
+        <input type="hidden" id="editar-usuario-id" />
+
+        <div class="formulario">
+          <div class="campo">
+            <label for="editar-usuario-nome">Nome</label>
+            <input id="editar-usuario-nome" required maxlength="200" />
+          </div>
+          <div class="campo">
+            <label for="editar-usuario-email">E-mail</label>
+            <input id="editar-usuario-email" type="email" required maxlength="200" />
+          </div>
+        </div>
+
+        <div class="dialogo-acoes">
+          <button
+            type="button"
+            class="botao secundario"
+            data-fechar-dialogo="dialogo-usuario"
+          >
+            Cancelar
+          </button>
+          <button type="submit" class="botao">Salvar alterações</button>
+        </div>
+      </form>
+    </dialog>
 
     <script>
       // ---------------------------------------------------------------
@@ -820,8 +955,8 @@
               .map(
                 (e) => `
                   <tr>
-                    <td>${escapar(e.livro.titulo)}</td>
-                    <td>${escapar(e.usuario.nome)}</td>
+                    <td>${rotuloComExclusao(e.livro.titulo, e.livro)}</td>
+                    <td>${rotuloComExclusao(e.usuario.nome, e.usuario)}</td>
                     <td>${formatarData(e.dataEmprestimo)}</td>
                     <td>${formatarData(e.dataPrevista)}</td>
                     <td>${etiquetaStatus(e)}</td>
@@ -846,6 +981,16 @@
         return `<tr><td colspan="${colunas}" class="vazio">${mensagem}</td></tr>`
       }
 
+      // Mostra o nome normalmente e, se o cadastro foi excluído, acrescenta
+      // uma etiqueta. É assim que o histórico continua legível.
+      function rotuloComExclusao(texto, registro) {
+        const marca =
+          registro && registro.excluidoEm
+            ? ' <span class="etiqueta removido">excluído</span>'
+            : ''
+        return escapar(texto) + marca
+      }
+
       function desenharLivros() {
         porId('tabela-livros').innerHTML = livros.length
           ? livros
@@ -862,11 +1007,29 @@
                         ? `<span class="etiqueta disponivel">${livro.exemplaresDisponiveis} disponível(is)</span>`
                         : '<span class="etiqueta esgotado">Esgotado</span>'
                     }</td>
+                    <td>
+                      <div class="acoes-tabela">
+                        <button
+                          type="button"
+                          class="botao pequeno secundario"
+                          data-editar-livro="${livro.id}"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          class="botao pequeno perigo"
+                          data-excluir-livro="${livro.id}"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 `,
               )
               .join('')
-          : linhaVazia(6, 'Nenhum livro cadastrado ainda.')
+          : linhaVazia(7, 'Nenhum livro cadastrado ainda.')
       }
 
       function desenharUsuarios() {
@@ -883,11 +1046,29 @@
                     <td>${escapar(usuario.email)}</td>
                     <td>${ativos}</td>
                     <td>${formatarData(usuario.criadoEm)}</td>
+                    <td>
+                      <div class="acoes-tabela">
+                        <button
+                          type="button"
+                          class="botao pequeno secundario"
+                          data-editar-usuario="${usuario.id}"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          class="botao pequeno perigo"
+                          data-excluir-usuario="${usuario.id}"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 `
               })
               .join('')
-          : linhaVazia(4, 'Nenhum usuário cadastrado ainda.')
+          : linhaVazia(5, 'Nenhum usuário cadastrado ainda.')
       }
 
       function desenharEmprestimos() {
@@ -896,8 +1077,8 @@
               .map(
                 (e) => `
                   <tr>
-                    <td>${escapar(e.livro.titulo)}</td>
-                    <td>${escapar(e.usuario.nome)}</td>
+                    <td>${rotuloComExclusao(e.livro.titulo, e.livro)}</td>
+                    <td>${rotuloComExclusao(e.usuario.nome, e.usuario)}</td>
                     <td>${formatarData(e.dataEmprestimo)}</td>
                     <td>${formatarData(e.dataPrevista)}</td>
                     <td>${e.dataDevolucao ? formatarData(e.dataDevolucao) : '—'}</td>
@@ -922,8 +1103,8 @@
               .map(
                 (e) => `
                   <tr>
-                    <td>${escapar(e.livro.titulo)}</td>
-                    <td>${escapar(e.usuario.nome)}</td>
+                    <td>${rotuloComExclusao(e.livro.titulo, e.livro)}</td>
+                    <td>${rotuloComExclusao(e.usuario.nome, e.usuario)}</td>
                     <td>${escapar(e.usuario.email)}</td>
                     <td>${formatarData(e.dataPrevista)}</td>
                     <td>${diasDeAtraso(e)} dia(s)</td>
@@ -1061,6 +1242,176 @@
           botao.disabled = false
           avisar(erro.message, 'erro')
         }
+      })
+
+      // ---------------------------------------------------------------
+      // Editar e excluir cadastros
+      // ---------------------------------------------------------------
+
+      // O mesmo botão "Cancelar" serve para os dois diálogos.
+      document.querySelectorAll('[data-fechar-dialogo]').forEach((botao) => {
+        botao.addEventListener('click', () => {
+          const dialogo = porId(botao.dataset.fecharDialogo)
+          if (dialogo && dialogo.open) dialogo.close()
+        })
+      })
+
+      function abrirEdicaoDeLivro(id) {
+        const livro = livros.find((item) => item.id === id)
+        if (!livro) return
+
+        porId('editar-livro-id').value = livro.id
+        porId('editar-livro-titulo').value = livro.titulo
+        porId('editar-livro-autor').value = livro.autor
+        porId('editar-livro-isbn').value = livro.isbn
+        porId('editar-livro-exemplares').value = livro.exemplaresTotal
+
+        porId('dialogo-livro').showModal()
+      }
+
+      function abrirEdicaoDeUsuario(id) {
+        const usuario = usuarios.find((item) => item.id === id)
+        if (!usuario) return
+
+        porId('editar-usuario-id').value = usuario.id
+        porId('editar-usuario-nome').value = usuario.nome
+        porId('editar-usuario-email').value = usuario.email
+
+        porId('dialogo-usuario').showModal()
+      }
+
+      porId('form-editar-livro').addEventListener('submit', async (evento) => {
+        evento.preventDefault()
+
+        const id = porId('editar-livro-id').value
+        const dados = {
+          titulo: porId('editar-livro-titulo').value.trim(),
+          autor: porId('editar-livro-autor').value.trim(),
+          isbn: porId('editar-livro-isbn').value.trim(),
+          exemplaresTotal: Number(porId('editar-livro-exemplares').value),
+        }
+
+        try {
+          await chamarApi(`/livros/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(dados),
+          })
+          porId('dialogo-livro').close()
+          avisar('Livro atualizado com sucesso.')
+          await carregarTudo()
+        } catch (erro) {
+          avisar(erro.message, 'erro')
+        }
+      })
+
+      porId('form-editar-usuario').addEventListener('submit', async (evento) => {
+        evento.preventDefault()
+
+        const id = porId('editar-usuario-id').value
+        const dados = {
+          nome: porId('editar-usuario-nome').value.trim(),
+          email: porId('editar-usuario-email').value.trim(),
+        }
+
+        try {
+          await chamarApi(`/usuarios/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(dados),
+          })
+          porId('dialogo-usuario').close()
+          avisar('Usuário atualizado com sucesso.')
+          await carregarTudo()
+        } catch (erro) {
+          avisar(erro.message, 'erro')
+        }
+      })
+
+      /**
+       * Exclui o livro. Só pergunta "tem certeza?" quando existe empréstimo,
+       * porque nesse caso o histórico é preservado e o livro sai do catálogo.
+       * Sem empréstimo, a exclusão é direta.
+       */
+      async function excluirLivro(id) {
+        const livro = livros.find((item) => item.id === id)
+        if (!livro) return
+
+        const historico = emprestimos.filter((item) => item.livroId === id).length
+
+        if (historico > 0) {
+          const confirmado = window.confirm(
+            `Este livro tem ${historico} empréstimo(s) registrado(s).\n\n` +
+              'O histórico será mantido e o livro sairá do catálogo.\n\n' +
+              'Deseja realmente excluir?',
+          )
+          if (!confirmado) return
+        }
+
+        try {
+          await chamarApi(`/livros/${id}`, { method: 'DELETE' })
+          avisar(
+            historico > 0
+              ? 'Livro removido do catálogo. O histórico foi preservado.'
+              : 'Livro excluído.',
+          )
+          await carregarTudo()
+        } catch (erro) {
+          avisar(erro.message, 'erro')
+        }
+      }
+
+      /** Mesma lógica do livro, agora para usuário. */
+      async function excluirUsuario(id) {
+        const usuario = usuarios.find((item) => item.id === id)
+        if (!usuario) return
+
+        const historico = emprestimos.filter(
+          (item) => item.usuarioId === id,
+        ).length
+
+        if (historico > 0) {
+          const confirmado = window.confirm(
+            `Este usuário tem ${historico} empréstimo(s) registrado(s).\n\n` +
+              'O histórico será mantido e o usuário sairá da lista.\n\n' +
+              'Deseja realmente excluir?',
+          )
+          if (!confirmado) return
+        }
+
+        try {
+          await chamarApi(`/usuarios/${id}`, { method: 'DELETE' })
+          avisar(
+            historico > 0
+              ? 'Usuário removido da lista. O histórico foi preservado.'
+              : 'Usuário excluído.',
+          )
+          await carregarTudo()
+        } catch (erro) {
+          avisar(erro.message, 'erro')
+        }
+      }
+
+      // Delegação de evento: as tabelas são redesenhadas a cada atualização,
+      // então o listener fica no tbody, que continua o mesmo.
+      porId('tabela-livros').addEventListener('click', (evento) => {
+        const editar = evento.target.closest('[data-editar-livro]')
+        if (editar) {
+          abrirEdicaoDeLivro(editar.dataset.editarLivro)
+          return
+        }
+
+        const excluir = evento.target.closest('[data-excluir-livro]')
+        if (excluir) excluirLivro(excluir.dataset.excluirLivro)
+      })
+
+      porId('tabela-usuarios').addEventListener('click', (evento) => {
+        const editar = evento.target.closest('[data-editar-usuario]')
+        if (editar) {
+          abrirEdicaoDeUsuario(editar.dataset.editarUsuario)
+          return
+        }
+
+        const excluir = evento.target.closest('[data-excluir-usuario]')
+        if (excluir) excluirUsuario(excluir.dataset.excluirUsuario)
       })
 
       // ---------------------------------------------------------------

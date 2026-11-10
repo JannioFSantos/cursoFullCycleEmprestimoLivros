@@ -86,18 +86,19 @@ describe('Manutenção de cadastros', () => {
       expect(await livros.buscarPorId(livro.id)).toBeNull()
     })
 
-    it('recusa excluir livro com empréstimos registrados', async () => {
+    it('preserva o histórico ao excluir livro com empréstimos', async () => {
       const livro = criarLivroFake({ exemplaresTotal: 1 })
       livros.livros.push(livro)
       livros.emprestimosRegistrados = 1
 
       const excluir = new ExcluirLivro(livros)
+      await excluir.executar(livro.id)
 
-      await expect(excluir.executar(livro.id)).rejects.toMatchObject({
-        codigo: 'LIVRO_COM_EMPRESTIMOS',
-        statusCode: 409,
-      })
-      expect(await livros.buscarPorId(livro.id)).not.toBeNull()
+      // A linha continua no "banco" (histórico), mas sai do catálogo.
+      const guardado = livros.livros.find((item) => item.id === livro.id)
+      expect(guardado?.excluidoEm).toBeInstanceOf(Date)
+      expect(await livros.buscarPorId(livro.id)).toBeNull()
+      expect(await livros.listarComDisponibilidade()).toHaveLength(0)
     })
 
     it('retorna 404 quando o livro não existe', async () => {
@@ -150,18 +151,18 @@ describe('Manutenção de cadastros', () => {
       expect(await usuarios.buscarPorId(usuario.id)).toBeNull()
     })
 
-    it('recusa excluir usuário com empréstimos registrados', async () => {
+    it('preserva o histórico ao excluir usuário com empréstimos', async () => {
       const usuario = criarUsuarioFake()
       usuarios.usuarios.push(usuario)
       usuarios.emprestimosRegistrados = 1
 
       const excluir = new ExcluirUsuario(usuarios)
+      await excluir.executar(usuario.id)
 
-      await expect(excluir.executar(usuario.id)).rejects.toMatchObject({
-        codigo: 'USUARIO_COM_EMPRESTIMOS',
-        statusCode: 409,
-      })
-      expect(await usuarios.buscarPorId(usuario.id)).not.toBeNull()
+      const guardado = usuarios.usuarios.find((item) => item.id === usuario.id)
+      expect(guardado?.excluidoEm).toBeInstanceOf(Date)
+      expect(await usuarios.buscarPorId(usuario.id)).toBeNull()
+      expect(await usuarios.listar()).toHaveLength(0)
     })
   })
 })

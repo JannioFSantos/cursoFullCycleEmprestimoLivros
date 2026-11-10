@@ -251,9 +251,9 @@ export function criarApp(dependencias: DependenciasDoApp): FastifyInstance {
 
   // Casos de uso de manutenção dos cadastros (editar/excluir).
   const atualizarLivro = new AtualizarLivro(livros)
-  const excluirLivro = new ExcluirLivro(livros)
+  const excluirLivro = new ExcluirLivro(livros, relogio)
   const atualizarUsuario = new AtualizarUsuario(usuarios)
-  const excluirUsuario = new ExcluirUsuario(usuarios)
+  const excluirUsuario = new ExcluirUsuario(usuarios, relogio)
 
   // O tratamento de erro precisa ser registrado ANTES das rotas para que as
   // rotas dentro de /API herdem o mesmo formato de resposta.

@@ -181,8 +181,9 @@ simples, servido pela própria API.
 Ela tem abas, como se fossem páginas separadas:
 
 - **Visão geral** — números do dia e os últimos empréstimos;
-- **Livros** — cadastro e catálogo com exemplares disponíveis;
-- **Usuários** — cadastro e lista de leitores;
+- **Livros** — cadastro, catálogo com exemplares disponíveis e botões de
+  editar/excluir;
+- **Usuários** — cadastro, lista de leitores e botões de editar/excluir;
 - **Empréstimos** — novo empréstimo, lista de quem pegou qual livro e botão
   de devolver;
 - **Atrasados** — quem passou do prazo e quantos dias.
@@ -193,7 +194,7 @@ um livro ali, ele fica no banco de verdade.
 ## Testes
 
 ```bash
-npm run test:unit          # 34 testes, sem banco, roda em ~1s
+npm run test:unit          # 36 testes, sem banco, roda em ~1s
 npm run test:integration   # 18 testes, com banco real
 npm run test:coverage      # tudo + cobertura
 ```
@@ -207,7 +208,8 @@ O que os testes cobrem:
 - devolver o mesmo empréstimo duas vezes (409);
 - editar livro e usuário, inclusive 404 para id inexistente;
 - bloquear redução de exemplares abaixo dos empréstimos ativos;
-- bloquear exclusão de livro/usuário que já tem empréstimo;
+- excluir livro/usuário com empréstimo preservando o histórico;
+- deixar de listar (e de emprestar) o livro/usuário excluído;
 - a tela de demonstração e a documentação Swagger respondendo;
 - as listas que alimentam a tela (`GET /API/usuarios` e `GET /API/emprestimos`);
 - o fluxo completo passando por HTTP e banco de verdade.
@@ -218,10 +220,10 @@ quebra se cair abaixo.
 
 | Métrica | Mínimo | Resultado |
 | --- | --- | --- |
-| Statements | 90% | 98,71% |
+| Statements | 90% | 100% |
 | Branches | 85% | 100% |
-| Functions | 90% | 97,14% |
-| Lines | 90% | 98,57% |
+| Functions | 90% | 100% |
+| Lines | 90% | 100% |
 
 ## Como o código está organizado
 
@@ -237,7 +239,7 @@ flowchart LR
 | Pasta | O que tem |
 | --- | --- |
 | `src/domain` | entidades, regras e erros. Não conhece banco nem HTTP |
-| `src/use-cases` | o fluxo de emprestar e devolver |
+| `src/use-cases` | emprestar, devolver, editar e excluir cadastros |
 | `src/infra` | implementação dos repositórios com Prisma |
 | `src/http` | rotas, validação com Zod e tratamento de erro |
 | `src/observability` | métricas do Prometheus |
@@ -253,7 +255,7 @@ As regras de negócio ficam em `src/domain`, e o acesso ao banco fica em
 `src/infra`. No meio deles existe uma interface
 (`src/domain/repositorios.ts`).
 
-Fiz isso para conseguir testar as regras sem subir banco. Os 34 testes
+Fiz isso para conseguir testar as regras sem subir banco. Os 36 testes
 unitários rodam em memória, com repositórios falsos.
 
 ### 2. Usei transação para o último exemplar
@@ -299,8 +301,19 @@ Todos os erros têm o mesmo formato:
 Códigos usados: `LIVRO_NAO_ENCONTRADO`, `USUARIO_NAO_ENCONTRADO`,
 `EMPRESTIMO_NAO_ENCONTRADO`, `LIVRO_INDISPONIVEL`, `USUARIO_COM_ATRASO`,
 `LIMITE_ATINGIDO`, `EMPRESTIMO_JA_DEVOLVIDO`, `VALOR_JA_CADASTRADO`,
-`EXEMPLARES_ABAIXO_DOS_EMPRESTIMOS`, `LIVRO_COM_EMPRESTIMOS`,
-`USUARIO_COM_EMPRESTIMOS` e `DADOS_INVALIDOS`.
+`EXEMPLARES_ABAIXO_DOS_EMPRESTIMOS` e `DADOS_INVALIDOS`.
+
+### 5. Exclusão com histórico é lógica, não física
+
+Se o livro ou o usuário nunca teve empréstimo, eu apago a linha do banco. Se
+já teve, não apago nada: gravo a data em `excluido_em`. As listas filtram
+`excluido_em IS NULL`, então o cadastro some da tela, mas a lista de
+empréstimos continua mostrando o nome antigo com a etiqueta **excluído**.
+
+Fiz assim porque apagar o livro apagaria também o registro de quem pegou. A
+tela pergunta "deseja realmente excluir?" só quando existe histórico. A
+explicação completa está em
+[`docs/adr/0002-exclusao-logica.md`](docs/adr/0002-exclusao-logica.md).
 
 ## Logs e métricas
 

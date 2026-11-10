@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   calcularDataPrevista,
   calcularDisponiveis,
+  decidirModoDeExclusao,
   estaAtrasado,
   inicioDoDia,
   validarEmprestimo,
@@ -129,5 +130,16 @@ describe('validarEmprestimo', () => {
     )
 
     expect(codigo).toBe('LIMITE_ATINGIDO')
+  })
+})
+
+describe('decidirModoDeExclusao', () => {
+  it('apaga de verdade quando não existe empréstimo', () => {
+    expect(decidirModoDeExclusao(0)).toBe('APAGAR')
+  })
+
+  it('preserva o histórico quando existe pelo menos um empréstimo', () => {
+    expect(decidirModoDeExclusao(1)).toBe('MANTER_HISTORICO')
+    expect(decidirModoDeExclusao(5)).toBe('MANTER_HISTORICO')
   })
 })
