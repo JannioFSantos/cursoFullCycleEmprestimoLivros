@@ -42,16 +42,17 @@ empréstimo antigo continua conseguindo mostrar o título e o nome.
 
 ## A decisão
 
-1. A regra pura `decidirModoDeExclusao(emprestimosRegistrados)` fica em
-   `src/domain/regras.ts` e devolve `APAGAR` ou `MANTER_HISTORICO`.
-2. O repositório Prisma faz a contagem e a gravação na mesma transação, com
-   `SELECT ... FOR UPDATE`. Isso evita que um empréstimo novo entre no meio.
+1. A regra pura `decidir_modo_de_exclusao(emprestimos_registrados)` fica em
+   `app/domain/regras.py` e devolve `ModoDeExclusao.APAGAR` ou
+   `ModoDeExclusao.MANTER_HISTORICO`.
+2. O repositório SQLAlchemy faz a contagem e a gravação na mesma transação,
+   com `with_for_update()`. Isso evita que um empréstimo novo entre no meio.
 3. O caso de uso passa a data da exclusão usando o `Relogio` injetado, do
    mesmo jeito que a devolução faz.
 4. A API continua respondendo `204`. O cliente não precisa saber se a linha
    foi apagada ou marcada.
-5. A tela pergunta "deseja realmente excluir?" somente quando existe
-   empréstimo, avisando que o histórico será mantido.
+5. A tela mostra uma página de confirmação somente quando existe empréstimo,
+   avisando que o histórico será mantido. Sem histórico, a exclusão é direta.
 
 ## O que muda com isso
 
@@ -71,8 +72,8 @@ empréstimo antigo continua conseguindo mostrar o título e o nome.
 
 ## Como conferir
 
-- Teste unitário: `decidirModoDeExclusao(0)` devolve `APAGAR` e
-  `decidirModoDeExclusao(1)` devolve `MANTER_HISTORICO`.
+- Teste unitário: `decidir_modo_de_exclusao(0)` devolve `APAGAR` e
+  `decidir_modo_de_exclusao(1)` devolve `MANTER_HISTORICO`.
 - Teste de integração: excluir livro/usuário com empréstimo devolve `204`, o
   cadastro some de `GET /API/livros` ou `GET /API/usuarios`, mas continua em
   `GET /API/emprestimos` com `excluidoEm` preenchido.

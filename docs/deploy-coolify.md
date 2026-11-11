@@ -25,6 +25,10 @@ postgres://postgres:senha@biblioteca-db:5432/postgres
 Use a interna, não a pública. A interna é mais rápida e não expõe o banco na
 internet.
 
+A aplicação aceita a URL nos formatos `postgres://` e `postgresql://`. Na
+inicialização ela troca o driver para `postgresql+psycopg://`, que é o que o
+SQLAlchemy + psycopg 3 esperam. Não precisa editar a URL copiada do Coolify.
+
 ## 3. Criar a aplicação
 
 1. **New → Application**.
@@ -41,16 +45,22 @@ Na aba **Environment Variables**, cadastre:
 
 | Variável | Valor |
 | --- | --- |
-| `NODE_ENV` | `production` |
+| `APP_ENV` | `production` |
 | `PORT` | `3000` |
 | `HOST` | `0.0.0.0` |
 | `LOG_LEVEL` | `info` |
 | `DATABASE_URL` | a URL interna do passo 2 (marque como secret) |
+| `SECRET_KEY` | valor aleatório, marcado como secret |
 | `PRAZO_DIAS` | `14` |
 | `LIMITE_EMPRESTIMOS` | `3` |
 
+`SECRET_KEY` assina o cookie de sessão usado pelas mensagens `flash` da tela
+de demonstração. Em produção, gere um valor aleatório; o padrão do código serve
+só para desenvolvimento.
+
 O `.env` do projeto não vai para o Git. No repositório só existe o
-`.env.example`.
+`.env.example`. Se você já tinha o ambiente antigo configurado com `NODE_ENV`,
+ele continua sendo aceito, mas o nome novo é `APP_ENV`.
 
 ## 5. Porta e healthcheck
 
@@ -75,8 +85,8 @@ Clique em **Deploy**. O que acontece:
 1. o Coolify baixa o repositório;
 2. roda o build do Dockerfile;
 3. inicia o container;
-4. o `scripts/entrypoint.sh` roda `prisma migrate deploy`;
-5. a API começa a escutar na porta 3000.
+4. o `scripts/entrypoint.sh` roda `alembic upgrade head`;
+5. o Gunicorn começa a escutar na porta 3000.
 
 Se a migration falhar, o container não sobe. Fiz assim de propósito: é melhor
 falhar no deploy do que rodar uma API com o banco desatualizado.
@@ -87,7 +97,8 @@ falhar no deploy do que rodar uma API com o banco desatualizado.
 curl -i https://agendadeconsultas.v6.rocks/health
 ```
 
-Deve voltar `200` com `{"status":"ok"}`.
+Deve voltar `200` com `{"status":"ok", ...}`. Se o banco estiver fora, a rota
+responde `503` com `{"status":"degradado","banco":"indisponivel"}`.
 
 A tela de demonstração fica em `https://agendadeconsultas.v6.rocks/`.
 A documentação Swagger fica em `https://agendadeconsultas.v6.rocks/API/docs`.
@@ -112,27 +123,37 @@ faz o deploy.
 
 ## 10. Migrations
 
-Normalmente não precisa fazer nada: o entrypoint roda `prisma migrate deploy`
-sozinho a cada start.
+Normalmente não precisa fazer nada: o entrypoint roda `alembic upgrade head`
+sozinho a cada start. O comando é idempotente e só aplica o que ainda não foi
+aplicado.
 
 Se precisar rodar na mão:
 
 ```bash
-docker exec -it <container> ./node_modules/.bin/prisma migrate deploy
+docker exec -it <container> alembic upgrade head
 ```
 
-Nunca rode `prisma migrate dev` em produção, porque ele pode apagar dados.
+Para ver o histórico:
+
+```bash
+docker exec -it <container> alembic current
+docker exec -it <container> alembic history
+```
+
+Evite rodar `alembic downgrade` em produção, porque ele desfaz alterações de
+schema e pode apagar dados.
 
 ## Erros que podem acontecer
 
 | Erro | Causa | O que fazer |
 | --- | --- | --- |
-| `P1001: Can't reach database server` | URL errada ou banco em outra rede | usar a URL interna e conferir se os dois estão no mesmo projeto |
-| `P3009: failed migrations` | uma migration falhou e ficou marcada | corrigir o SQL e rodar `prisma migrate resolve --rolled-back` |
-| Container reiniciando sozinho | `DATABASE_URL` faltando | ver os logs; a validação de env mostra o que falta |
-| 502 Bad Gateway | API não escutou em `0.0.0.0:3000` | conferir `HOST`, `PORT` e a porta exposta |
+| `psycopg.OperationalError: connection failed` | URL errada ou banco em outra rede | usar a URL interna e conferir se os dois estão no mesmo projeto |
+| `could not translate host name` | o host da URL não é o nome do serviço do banco | copiar de novo a URL interna do PostgreSQL |
+| `Target database is not up to date` | a aplicação subiu sem aplicar migration | rodar `alembic upgrade head` no container |
+| Container reiniciando sozinho | `DATABASE_URL` faltando ou inválida | ver os logs; a validação de configuração mostra o que falta |
+| `502 Bad Gateway` | API não escutou em `0.0.0.0:3000` | conferir `HOST`, `PORT` e a porta exposta |
 | Healthcheck falhando | banco fora ou migration pendente | abrir `/health`; se der 503, o problema é o banco |
-| Build lento | `npm ci` sem cache | o Dockerfile já copia o `package.json` antes do código |
+| Build lento | dependências sendo reinstaladas | o Dockerfile copia `requirements.txt` antes do código, então o cache só é invalidado quando as dependências mudam |
 
 ## Segurança
 
@@ -140,4 +161,4 @@ Nunca rode `prisma migrate dev` em produção, porque ele pode apagar dados.
 - o `.env.example` não tem senha real;
 - o banco não precisa de porta pública;
 - ative o backup automático do PostgreSQL;
-- o container roda como usuário `node`, não como root.
+- o container roda como usuário `app` (uid 10001), não como root.

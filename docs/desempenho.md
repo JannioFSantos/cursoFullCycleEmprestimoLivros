@@ -6,57 +6,76 @@ de execução de verdade.
 ## Onde rodei
 
 - Windows 11 com Docker Desktop;
-- API em container `node:22-alpine`;
+- API em container `python:3.12-slim`, com Gunicorn (2 workers e 4 threads);
 - PostgreSQL em container `postgres:16-alpine`;
-- k6 em container, na mesma rede;
+- Locust rodando na máquina host, apontando para `http://127.0.0.1:3000/API`;
 - sem cache e sem tuning.
+
+Usei `127.0.0.1` em vez de `localhost` de propósito: no Windows, o
+`localhost` pode tentar IPv6 primeiro e adicionar cerca de 2 segundos por
+requisição, o que estragaria a medição.
 
 ## Smoke test
 
-O `k6/smoke.js` faz o fluxo completo uma vez: cria livro, cria usuário,
+O `locust/smoke.py` faz o fluxo completo uma vez: cria livro, cria usuário,
 empresta, devolve e lista atrasados.
+
+```bash
+locust -f locust/smoke.py --headless -u 1 -r 1 -t 10s --only-summary
+```
 
 | Item | Resultado |
 | --- | --- |
-| Checks | 5 de 5 (100%) |
-| Requisições com erro | 0% |
-| p95 | 40,18 ms |
+| Requisições | 5 |
+| Falhas | 0 |
+| Tempo máximo | 48 ms |
 
-O primeiro número que medi foi 58,83 ms. Depois de mover a API para `/API`,
-rodei de novo e o p95 ficou em 40,18 ms. A diferença é ruído da máquina, não
-uma otimização.
+Se esse teste falhar, não adianta rodar o teste de carga.
 
 ## Teste de carga
 
-O `k6/load.js` roda 1 minuto com dois cenários ao mesmo tempo:
+O `locust/load.py` roda 1 minuto com dois cenários ao mesmo tempo:
 
-- 20 usuários virtuais lendo `GET /livros`;
-- até 10 usuários virtuais criando empréstimos em `POST /emprestimos`.
+- leitores, com peso 2, chamando `GET /livros`;
+- escritores, com peso 1, criando empréstimos em `POST /emprestimos`.
 
-Um detalhe importante: no teste de escrita, **todos pedem o mesmo livro**.
-Fiz assim de propósito para forçar a disputa pelo `FOR UPDATE`. Na vida real
-os pedidos se espalham entre vários livros.
+```bash
+locust -f locust/load.py --headless -u 30 -r 5 -t 1m --only-summary
+```
+
+Um detalhe importante: no teste de escrita, **todos pedem o mesmo livro**. O
+cenário cria um livro com 5.000 exemplares e 300 usuários, e cada escritor
+sorteia um usuário. Fiz assim de propósito para forçar a disputa pelo
+`FOR UPDATE`. Na vida real os pedidos se espalham entre vários livros.
 
 | Item | Resultado |
 | --- | --- |
-| Total de requisições | 42.947 |
-| Requisições por segundo | ~687 |
-| Checks | 100% (42.646 de 42.646) |
+| Usuários virtuais | 30 |
+| Duração | 60 s |
+| Total de requisições | 4.539 |
+| Requisições por segundo | 77,29 |
+| Falhas técnicas | 0 |
 
-| Cenário | p90 | p95 | Limite | Passou? |
-| --- | --- | --- | --- | --- |
-| Leitura (`GET /livros`) | 37,44 ms | 41,28 ms | 300 ms | Sim |
-| Escrita (`POST /emprestimos`) | 242,37 ms | 264,48 ms | 500 ms | Sim |
+| Cenário | p95 | Limite | Passou? |
+| --- | --- | --- | --- |
+| Leitura (`GET /livros`) | 85 ms | 300 ms | Sim |
+| Escrita (`POST /emprestimos`) | 150 ms | 500 ms | Sim |
+| Agregado | 120 ms | — | — |
 
-### Por que apareceram 409
+O próprio `locust/load.py` verifica o SLO no fim do teste. Se o p95 de leitura
+passar de 300 ms ou o de escrita passar de 500 ms, o processo termina com
+código de saída `1` — assim o teste de carga também serve de portão no CI ou
+numa execução manual.
 
-No cenário de escrita, 1.513 de 2.710 requisições receberam `409`. Isso está
-certo: cada usuário só pode ter 3 empréstimos ativos, e o teste tinha 300
-usuários. O k6 conta `409` como requisição "falha" por padrão, por isso o
-número geral de erro apareceu como 3,52%, mesmo com 100% dos checks passando.
+### Por que aparecem respostas 409
 
-Ou seja: nesse projeto, olhar só a taxa de erro do k6 engana. O que importa é
-o check de negócio (201 ou 409) e o tempo.
+No cenário de escrita, o `409` é esperado: cada usuário só pode ter 3
+empréstimos ativos e o limite é uma regra de negócio, não uma falha técnica.
+Por isso o teste considera `201` **e** `409` como sucesso. O que ele mede de
+verdade é o tempo e a ausência de erros `5xx`.
+
+Olhar só a taxa de erro bruta do Locust engana neste projeto. O que importa é
+o check de negócio (201 ou 409) e o p95.
 
 ### Por que a escrita é mais lenta
 
@@ -68,14 +87,14 @@ A leitura faz uma consulta simples. A escrita faz, dentro de uma transação:
 4. insere o empréstimo.
 
 Com todo mundo pedindo o mesmo livro, as transações esperam umas pelas outras.
-Por isso o p95 fica em 264 ms. É o custo de garantir que o mesmo exemplar não
-seja emprestado duas vezes.
+Por isso o p95 fica em 150 ms, contra 85 ms da leitura. É o custo de garantir
+que o mesmo exemplar não seja emprestado duas vezes.
 
 ## Teste do índice
 
 Para ver se o índice faz diferença, gerei 20 mil empréstimos com
-`npm run db:seed:volume` e rodei a consulta da disponibilidade com e sem o
-índice `(livro_id, status)`.
+`python -m scripts.seed_volume` e rodei a consulta da disponibilidade com e sem
+o índice `(livro_id, status)`.
 
 ```sql
 SELECT count(*) FROM emprestimos
@@ -84,14 +103,15 @@ WHERE livro_id = $1 AND status = 'ATIVO';
 
 | Situação | Plano | Buffers | Tempo |
 | --- | --- | --- | --- |
-| Com índice | Index Only Scan | 42 | 0,601 ms |
-| Sem índice | Seq Scan (19.960 linhas filtradas) | 266 | 2,439 ms |
+| Com índice | `Index Only Scan` | 196 | 1,180 ms |
+| Sem índice | `Seq Scan` (19.751 linhas filtradas) | 287 | 3,406 ms |
 
-Com o índice foi umas 4 vezes mais rápido e leu bem menos páginas do banco. O
-índice já está no `schema.prisma` e vai junto na migration.
+Com o índice foi quase 3 vezes mais rápido e leu menos páginas do banco. O
+índice já está na migration `0001_inicial` e é recriado por
+`alembic upgrade head`.
 
-A consulta de atrasados usa o índice `(status, data_prevista)` e levou 7,3 ms
-para 14.990 linhas.
+O script `scripts/seed_volume.py` apaga os empréstimos existentes antes de
+inserir os 20 mil. Use só no banco local.
 
 ## O que eu faria diferente
 
@@ -106,17 +126,56 @@ melhorar o número. O risco de dado errado não compensa.
 
 ## Como reproduzir
 
+Suba o banco e a API:
+
 ```bash
 docker compose up -d --build
-
-docker run --rm --network cursofullcycleemprestimolivros_default \
-  -e BASE_URL=http://api:3000/API -v "${PWD}/k6:/scripts" \
-  grafana/k6 run /scripts/smoke.js
-
-docker run --rm --network cursofullcycleemprestimolivros_default \
-  -e BASE_URL=http://api:3000/API -v "${PWD}/k6:/scripts" \
-  grafana/k6 run /scripts/load.js
 ```
 
-O `npm run db:seed:volume` apaga os empréstimos existentes. Use só no banco
-local.
+Rode os testes de carga na máquina host (com as dependências de
+desenvolvimento instaladas):
+
+```bash
+locust -f locust/smoke.py --headless -u 1 -r 1 -t 10s --only-summary
+locust -f locust/load.py --headless -u 30 -r 5 -t 1m --only-summary
+```
+
+Para medir o índice, use o banco local:
+
+```bash
+# com o .env apontando para localhost:5432/biblioteca
+alembic upgrade head
+python -m scripts.seed_volume
+
+docker exec -it biblioteca-db psql -U postgres -d biblioteca
+```
+
+Dentro do `psql`:
+
+```sql
+-- pegue um id de livro do volume
+SELECT id FROM livros WHERE isbn LIKE 'volume-%' LIMIT 1;
+
+-- com índice
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT count(*) FROM emprestimos
+WHERE livro_id = '<id>' AND status = 'ATIVO';
+
+-- sem índice
+DROP INDEX emprestimos_livro_id_status_idx;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT count(*) FROM emprestimos
+WHERE livro_id = '<id>' AND status = 'ATIVO';
+
+-- recrie no fim
+CREATE INDEX emprestimos_livro_id_status_idx
+  ON emprestimos (livro_id, status);
+```
+
+Para apontar o Locust para outro ambiente, use `BASE_URL`:
+
+```bash
+BASE_URL=https://agendadeconsultas.v6.rocks/API \
+  locust -f locust/smoke.py --headless -u 1 -r 1 -t 10s
+```

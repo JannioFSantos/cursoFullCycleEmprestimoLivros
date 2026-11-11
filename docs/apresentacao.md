@@ -23,9 +23,10 @@ curl http://localhost:3000/health
 
 Falar mais ou menos assim:
 
-> "Meu projeto é uma API de empréstimo de livros. Ela cadastra livro e usuário,
-> empresta, devolve e lista atrasados. O problema de verdade não é o CRUD: é
-> impedir que duas pessoas levem o mesmo último exemplar ao mesmo tempo.
+> "Meu projeto é uma API de empréstimo de livros, feita em Python com Flask.
+> Ela cadastra livro e usuário, empresta, devolve e lista atrasados. O problema
+> de verdade não é o CRUD: é impedir que duas pessoas levem o mesmo último
+> exemplar ao mesmo tempo.
 >
 > Escolhi o Projeto B porque tinha pouco tempo e preferi entregar um fluxo
 > pequeno funcionando do que um projeto grande pela metade."
@@ -34,10 +35,11 @@ Mostrar a primeira linha do README: `Nível: Projeto B`.
 
 ## Minuto 1 a 4 — Demonstração
 
-> Primeiro abro `http://localhost:3000`, a tela de demonstração. Ela tem abas
-> de livros, usuários, empréstimos e atrasados, e conversa com a API de
-> verdade. Também posso abrir `http://localhost:3000/API/docs` para mostrar o
-> Swagger e testar pelo botão **Try it out**.
+> Primeiro abro `http://localhost:3000`, a tela de demonstração. Ela é feita
+> com Flask + Jinja: o HTML chega pronto do servidor e não tem JavaScript no
+> navegador. As abas de livros, usuários, empréstimos e atrasados são páginas
+> de verdade. Também posso abrir `http://localhost:3000/API/docs` para mostrar
+> o Swagger e testar pelo botão **Try it out**.
 
 Cadastrar livro, usuário e emprestar:
 
@@ -94,17 +96,17 @@ Abrir `docs/adr/0001-disponibilidade.md` e explicar com as minhas palavras:
 Se perguntarem do custo:
 
 > "O custo é que pedidos do mesmo livro ficam em fila. Isso apareceu no teste
-> de carga: a escrita ficou com p95 de 264 ms contra 41 ms da leitura."
+> de carga: a escrita ficou com p95 de 150 ms contra 85 ms da leitura."
 
 ## Minuto 7 a 10 — Números
 
 Mostrar a tabela de `docs/desempenho.md`:
 
-- smoke: 5/5 checks, p95 de 40,18 ms;
-- carga: ~687 req/s;
-- leitura p95 de 41,28 ms;
-- escrita p95 de 264,48 ms;
-- índice: 0,601 ms com e 2,439 ms sem.
+- smoke: 5 requisições, 0 falhas, máximo de 48 ms;
+- carga: 4.539 requisições em 60 s, 77,29 req/s;
+- leitura p95 de 85 ms;
+- escrita p95 de 150 ms;
+- índice: 1,180 ms com e 3,406 ms sem.
 
 Fechar:
 
@@ -119,6 +121,7 @@ Fechar:
 | Por que não usar `SERIALIZABLE`? | Ia aumentar o custo e os retries; o `FOR UPDATE` resolve o ponto exato da disputa. |
 | E se o processo morrer no meio? | A transação que não terminou é desfeita pelo PostgreSQL. |
 | Por que UUID? | Não mostra o volume de registros e dá para gerar antes de inserir. |
+| Por que Flask e não Node? | Eu conheço Python melhor e consigo defender cada linha do projeto. O contrato da API continua o mesmo. |
 | Como o Coolify sabe se está ok? | O healthcheck chama `/health`, que também testa o banco. |
 | Onde ficam as senhas? | Só no painel do Coolify. No repositório tem apenas `.env.example`. |
-| 90% de cobertura é real? | Sim, medido em `src/domain` e `src/use-cases`, que é onde ficam as regras. |
+| 90% de cobertura é real? | Sim. O mínimo é 90% e a última execução deu 100% em `app/domain` e `app/use_cases`, que é onde ficam as regras. |

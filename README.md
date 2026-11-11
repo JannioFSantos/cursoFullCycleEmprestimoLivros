@@ -5,12 +5,15 @@
 [![CI](https://github.com/JannioFSantos/cursoFullCycleEmprestimoLivros/actions/workflows/ci.yml/badge.svg)](https://github.com/JannioFSantos/cursoFullCycleEmprestimoLivros/actions/workflows/ci.yml)
 
 Esse é o meu projeto final do curso. É uma API para controlar empréstimo e
-devolução de livros de uma biblioteca.
+devolução de livros de uma biblioteca, escrita em **Python com Flask**.
 
-Escolhi o **Projeto B** porque tinha 8 dias para entregar. Preferi fazer uma
-coisa pequena funcionando de verdade do que um projeto grande pela metade.
+Escolhi o **Projeto B** porque tinha pouco tempo para entregar. Preferi fazer
+uma coisa pequena funcionando de verdade do que um projeto grande pela metade.
 Mesmo sendo simples, tentei usar o que aprendi no curso: Docker, separação de
 camadas, testes, CI, logs, métricas e teste de carga.
+
+Esta é a versão Python do projeto, com o mesmo contrato de API da versão
+anterior em TypeScript. Quem já usava os endpoints não precisa mudar nada.
 
 ## O que a API faz
 
@@ -26,23 +29,26 @@ camadas, testes, CI, logs, métricas e teste de carga.
 
 A parte mais importante é a regra do exemplar. Se duas pessoas tentarem pegar
 o último exemplar ao mesmo tempo, uma recebe `201` e a outra recebe `409`. Para
-isso usei uma transação no banco com `SELECT ... FOR UPDATE`.
+isso uso uma transação no banco com `SELECT ... FOR UPDATE` (via SQLAlchemy).
 
-Além da API, fiz uma tela simples de demonstração. Ela abre na raiz do site e
-usa a própria API para mostrar cadastros, empréstimos, devoluções e atrasados.
+Além da API, fiz uma tela simples de demonstração. Ela abre na raiz do site e é
+renderizada no servidor com **Jinja**: não tem JavaScript nenhum no navegador.
 
 ## Tecnologias que usei
 
-- **Node.js 22 + TypeScript** — linguagem do curso, com tipos;
-- **Fastify** — servidor HTTP;
+- **Python 3.12** — linguagem do projeto;
+- **Flask 3.1** — servidor HTTP e templates Jinja;
 - **PostgreSQL 16** — banco de dados;
-- **Prisma** — acesso ao banco e migrations;
-- **Zod** — validação dos dados que chegam;
-- **Vitest** — testes;
-- **pino** — logs (já vem dentro do Fastify);
-- **prom-client** — métricas para o Prometheus;
-- **Swagger** — documentação interativa em `/API/docs`;
-- **k6** — teste de carga;
+- **SQLAlchemy 2.0** — acesso ao banco e transações;
+- **psycopg 3** — driver do PostgreSQL;
+- **Alembic** — migrations do banco;
+- **Pydantic v2** — validação dos dados que chegam;
+- **pytest** — testes unitários e de integração;
+- **logging** da biblioteca padrão — logs em JSON;
+- **prometheus_client** — métricas para o Prometheus;
+- **flask-swagger-ui** — documentação interativa em `/API/docs`;
+- **Locust** — teste de carga (substituiu o k6 da versão TypeScript);
+- **Gunicorn** — servidor de produção dentro do container;
 - **Docker Compose** — subir tudo com um comando.
 
 ## Como rodar
@@ -74,8 +80,8 @@ Resposta esperada:
 Agora abra `http://localhost:3000` no navegador. Essa é a tela de
 demonstração. A API em si fica em `http://localhost:3000/API`.
 
-Quando o container da API inicia, ele roda as migrations do banco sozinho
-(`prisma migrate deploy`). Não precisa rodar nada à mão.
+Quando o container da API inicia, ele roda as migrations sozinho
+(`alembic upgrade head`). Não precisa rodar nada à mão.
 
 Para ver os logs:
 
@@ -91,38 +97,45 @@ docker compose down
 
 ### Sem Docker (para desenvolver)
 
+Precisa de Python 3.12 e de um PostgreSQL. O jeito mais fácil de ter o banco é
+subir só o serviço `db` do Compose.
+
 ```bash
 cp .env.example .env
-npm install
+
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
 
 # sobe só o banco
 docker compose up -d db
 
 # cria as tabelas
-npm run db:deploy
+alembic upgrade head
 
 # dados de exemplo (opcional)
-npm run db:seed
+python -m scripts.seed
 
 # API com reload automático
-npm run dev
+python -m app
 ```
 
 ### Principais comandos
 
 | Comando | O que faz |
 | --- | --- |
-| `npm run dev` | sobe a API em desenvolvimento |
-| `npm run build` | compila para `dist/` |
-| `npm start` | roda a versão compilada |
-| `npm run lint` | roda o ESLint |
-| `npm test` | roda todos os testes (precisa do banco) |
-| `npm run test:unit` | só testes de regra, sem banco |
-| `npm run test:integration` | só teste com banco |
-| `npm run test:coverage` | testes + cobertura |
-| `npm run db:deploy` | aplica as migrations |
-| `npm run db:seed` | cadastra 10 livros e 5 usuários de teste |
-| `npm run db:studio` | abre o Prisma Studio |
+| `python -m app` | sobe a API em desenvolvimento, com reload |
+| `gunicorn "app:create_app()"` | roda a versão de produção |
+| `ruff check .` | roda o lint |
+| `pytest` | roda todos os testes (precisa do banco) |
+| `pytest tests/unit` | só testes de regra, sem banco |
+| `pytest tests/integration` | só testes com banco |
+| `pytest --cov --cov-report=term-missing` | testes + cobertura |
+| `alembic upgrade head` | aplica as migrations |
+| `python -m scripts.seed` | cadastra 10 livros e 5 usuários de teste |
+| `python -m scripts.seed_volume` | gera 20 mil empréstimos para medir índice |
+| `locust -f locust/smoke.py --headless -u 1 -r 1 -t 10s` | smoke test |
+| `locust -f locust/load.py --headless -u 30 -r 5 -t 1m` | teste de carga |
 
 ## Como testar na mão
 
@@ -166,37 +179,41 @@ Nessa tela dá para ver todas as rotas, os dados que cada uma recebe, as
 respostas e até testar direto pelo botão **Try it out**.
 
 O contrato fica no arquivo `docs/openapi.yaml`. É o mesmo arquivo que o
-Swagger mostra e que o CI valida com o Spectral. Se quiser o contrato em JSON,
-basta acessar `/API/docs/json`.
+Swagger mostra e que o CI valida com o `openapi-spec-validator`. Se quiser o
+contrato em JSON, basta acessar `/API/docs/json`.
 
 Em produção fica no mesmo endereço da API:
 `https://agendadeconsultas.v6.rocks/API/docs`.
 
 ## Tela de demonstração
 
-A tela fica em `https://agendadeconsultas.v6.rocks/` e não tem framework nem
-build. É um único arquivo HTML (`public/index.html`) com CSS e JavaScript
-simples, servido pela própria API.
+A tela fica em `https://agendadeconsultas.v6.rocks/` e é feita com Flask +
+Jinja. Não tem framework de frontend, build de JavaScript nem chamadas `fetch`:
+o HTML já chega pronto do servidor.
 
-Ela tem abas, como se fossem páginas separadas:
+Ela tem as mesmas abas de antes, agora como páginas de verdade:
 
 - **Visão geral** — números do dia e os últimos empréstimos;
-- **Livros** — cadastro, catálogo com exemplares disponíveis e botões de
+- **Livros** — cadastro, catálogo com exemplares disponíveis e links de
   editar/excluir;
-- **Usuários** — cadastro, lista de leitores e botões de editar/excluir;
+- **Usuários** — cadastro, lista de leitores e links de editar/excluir;
 - **Empréstimos** — novo empréstimo, lista de quem pegou qual livro e botão
   de devolver;
 - **Atrasados** — quem passou do prazo e quantos dias.
 
-Tudo o que aparece na tela vem de chamadas reais para `/API`. Se você cadastrar
-um livro ali, ele fica no banco de verdade.
+Os formulários usam `POST` e redirecionam de volta para a lista
+(padrão POST/Redirect/Get), com mensagens de sucesso ou erro via `flash`.
+Editar e excluir têm páginas próprias em vez de janelas de diálogo.
+
+Tudo o que aparece na tela vem do mesmo banco que a API usa. Se você cadastrar
+um livro ali, ele fica no banco de verdade e aparece em `GET /API/livros`.
 
 ## Testes
 
 ```bash
-npm run test:unit          # 36 testes, sem banco, roda em ~1s
-npm run test:integration   # 18 testes, com banco real
-npm run test:coverage      # tudo + cobertura
+pytest tests/unit          # 39 testes, sem banco, roda em ~1s
+pytest tests/integration   # 20 testes, com banco real
+pytest --cov               # tudo + cobertura
 ```
 
 O que os testes cobrem:
@@ -214,22 +231,19 @@ O que os testes cobrem:
 - as listas que alimentam a tela (`GET /API/usuarios` e `GET /API/emprestimos`);
 - o fluxo completo passando por HTTP e banco de verdade.
 
-A cobertura é medida só em `src/domain` e `src/use-cases`, que é onde ficam as
-regras de negócio. O mínimo está declarado no `vitest.config.mts` e o CI
-quebra se cair abaixo.
+A cobertura é medida só em `app/domain` e `app/use_cases`, que é onde ficam as
+regras de negócio. O mínimo está declarado no `pyproject.toml` e o CI quebra se
+cair abaixo.
 
 | Métrica | Mínimo | Resultado |
 | --- | --- | --- |
-| Statements | 90% | 100% |
-| Branches | 85% | 100% |
-| Functions | 90% | 100% |
-| Lines | 90% | 100% |
+| Cobertura total (linhas + branches) | 90% | 100% |
 
 ## Como o código está organizado
 
 ```mermaid
 flowchart LR
-  A[Cliente] --> B[Rotas]
+  A[Cliente] --> B[Rotas Flask]
   B --> C[Casos de uso]
   C --> D[Regras do domínio]
   C --> E[Repositórios]
@@ -238,25 +252,28 @@ flowchart LR
 
 | Pasta | O que tem |
 | --- | --- |
-| `src/domain` | entidades, regras e erros. Não conhece banco nem HTTP |
-| `src/use-cases` | emprestar, devolver, editar e excluir cadastros |
-| `src/infra` | implementação dos repositórios com Prisma |
-| `src/http` | rotas, validação com Zod e tratamento de erro |
-| `src/observability` | métricas do Prometheus |
-| `public` | tela de demonstração (HTML único) |
+| `app/domain` | entidades, regras e erros. Não conhece banco nem HTTP |
+| `app/use_cases` | emprestar, devolver, editar e excluir cadastros |
+| `app/infra` | modelos SQLAlchemy e implementação dos repositórios |
+| `app/http` | rotas, validação com Pydantic e tratamento de erro |
+| `app/observabilidade` | logs em JSON e métricas do Prometheus |
+| `app/web` + `app/templates` | tela de demonstração com Jinja, sem JavaScript |
+| `app/static` | o único CSS da tela |
+| `migrations` | migrations do Alembic |
 | `tests/unit` | testes sem banco |
 | `tests/integration` | testes com banco real |
+| `locust` | smoke test e teste de carga |
 
 ## Decisões que tomei
 
 ### 1. Separei as regras do banco (padrão Repository)
 
-As regras de negócio ficam em `src/domain`, e o acesso ao banco fica em
-`src/infra`. No meio deles existe uma interface
-(`src/domain/repositorios.ts`).
+As regras de negócio ficam em `app/domain`, e o acesso ao banco fica em
+`app/infra`. No meio deles existe uma interface
+(`app/domain/repositorios.py`), implementada com SQLAlchemy.
 
-Fiz isso para conseguir testar as regras sem subir banco. Os 36 testes
-unitários rodam em memória, com repositórios falsos.
+Fiz isso para conseguir testar as regras sem subir banco. Os 39 testes
+unitários rodam em memória, com repositórios falsos (`tests/fakes.py`).
 
 ### 2. Usei transação para o último exemplar
 
@@ -280,8 +297,8 @@ com as alternativas que descartei, está em
 
 ### 3. Criei um relógio que dá para trocar
 
-Em vez de chamar `new Date()` em qualquer lugar, o código usa um objeto
-`Relogio` (`src/domain/relogio.ts`). Em produção ele retorna a data de agora.
+Em vez de chamar `datetime.now()` em qualquer lugar, o código usa um objeto
+`Relogio` (`app/domain/relogio.py`). Em produção ele retorna a data de agora.
 Nos testes, eu consigo "voltar no tempo" para simular um empréstimo atrasado
 sem esperar 14 dias.
 
@@ -322,12 +339,14 @@ status e tempo:
 
 ```json
 {
+  "hora": "2026-11-11T12:00:00.000+00:00",
+  "nivel": "info",
+  "msg": "requisicao_concluida",
   "requisicaoId": "0d6e2a3f-...",
   "metodo": "POST",
   "rota": "/API/emprestimos",
   "status": 201,
-  "duracaoMs": 12.4,
-  "msg": "requisicao_concluida"
+  "duracaoMs": 12.4
 }
 ```
 
@@ -335,7 +354,7 @@ Em `/metrics` ficam as métricas:
 
 - `http_request_duration_seconds` — tempo de cada rota (para calcular p95);
 - `emprestimos_total` — quantos empréstimos foram criados e quantos recusados;
-- métricas padrão do Node (memória, CPU etc).
+- métricas padrão de processo (memória, CPU, threads, GC).
 
 O SLO que defini foi: **p95 de `POST /emprestimos` abaixo de 500 ms** e
 **p95 de `GET /livros` abaixo de 300 ms**, com menos de 1% de erro técnico nas
@@ -351,10 +370,10 @@ Resultado medido na minha máquina com Docker (os detalhes estão em
 
 | Teste | Resultado |
 | --- | --- |
-| Smoke (`k6/smoke.js`) | 5/5 checks, p95 de 40,18 ms |
-| Carga (`k6/load.js`) | ~687 req/s |
-| Leitura `GET /livros` | p95 de 41,28 ms |
-| Escrita `POST /emprestimos` | p95 de 264,48 ms |
+| Smoke (`locust/smoke.py`) | 5 requisições, 0 falhas, máximo de 48 ms |
+| Carga (`locust/load.py`, 30 usuários por 60 s) | 4.539 requisições, 77,29 req/s |
+| Leitura `GET /livros` | p95 de 85 ms |
+| Escrita `POST /emprestimos` | p95 de 150 ms |
 
 A escrita é mais lenta porque o teste força todo mundo a pedir o mesmo livro.
 É o pior caso, e foi de propósito, para mostrar o custo do `FOR UPDATE`.
@@ -380,11 +399,12 @@ Variáveis necessárias:
 
 | Variável | Valor |
 | --- | --- |
-| `NODE_ENV` | `production` |
+| `APP_ENV` | `production` |
 | `PORT` | `3000` |
 | `HOST` | `0.0.0.0` |
 | `LOG_LEVEL` | `info` |
 | `DATABASE_URL` | URL interna do PostgreSQL |
+| `SECRET_KEY` | valor aleatório, marcado como secret |
 | `PRAZO_DIAS` | `14` |
 | `LIMITE_EMPRESTIMOS` | `3` |
 
@@ -410,8 +430,9 @@ carga com livros diferentes.
 ## Uso de IA
 
 Está declarado em [`docs/ia.md`](docs/ia.md). Usei IA para tirar dúvidas,
-revisar o ADR e gerar a primeira versão dos testes. As decisões e os números
-são meus, e eu conferi tudo rodando.
+revisar o ADR, gerar a primeira versão dos testes e ajudar na migração de
+TypeScript para Python. As decisões e os números são meus, e eu conferi tudo
+rodando.
 
 ## Apresentação
 

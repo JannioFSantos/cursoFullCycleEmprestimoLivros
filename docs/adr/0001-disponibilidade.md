@@ -50,12 +50,25 @@ novo e aí sim decide.
 
 ## A decisão
 
-Dentro de uma transação, eu travo a linha do livro:
+Dentro de uma transação, eu travo a linha do livro com SQLAlchemy:
+
+```python
+livro = sessao.execute(
+    select(LivroModelo)
+    .where(
+        LivroModelo.id == dados.livro_id,
+        LivroModelo.excluido_em.is_(None),
+    )
+    .with_for_update()
+).scalar_one_or_none()
+```
+
+O SQL gerado é o mesmo de antes:
 
 ```sql
 SELECT id, exemplares_total
 FROM livros
-WHERE id = $1
+WHERE id = $1 AND excluido_em IS NULL
 FOR UPDATE;
 ```
 
@@ -64,11 +77,14 @@ falhar, a transação é desfeita e a API responde `409`.
 
 Também travo a linha do usuário, sempre **depois** do livro. Mantenho essa
 ordem em todas as transações para evitar deadlock (duas transações esperando
-uma pela outra).
+uma pela outra). A transação usa `SET LOCAL lock_timeout = '10s'`: se a espera
+por um lock passar de 10 segundos, o PostgreSQL aborta em vez de segurar a
+requisição para sempre.
 
-A validação continua em uma função pura (`validarEmprestimo`), que é a mesma
-usada nos testes unitários. O repositório só chama essa função dentro da
-transação.
+A validação continua em uma função pura (`validar_emprestimo`, em
+`app/domain/regras.py`), que é a mesma usada nos testes unitários. O
+repositório (`app/infra/repositorios.py`, método `criar_com_bloqueio`) só
+chama essa função dentro da transação.
 
 ## O que muda com isso
 
@@ -77,15 +93,18 @@ transação.
 - se duas pessoas pedirem o último exemplar juntas, uma recebe `201` e a outra
   `409`;
 - não precisei adicionar Redis nem outra infraestrutura;
-- a regra continua testável sem banco.
+- a regra continua testável sem banco;
+- a mesma função de validação roda nos testes unitários e em produção.
 
 **Ruim:**
 
 - pedidos para o mesmo livro ficam em fila, um esperando o outro. No teste de
-  carga isso apareceu: a escrita ficou com p95 de 264 ms, contra 41 ms da
+  carga isso apareceu: a escrita ficou com p95 de 150 ms, contra 85 ms da
   leitura. Está em `docs/desempenho.md`;
 - quem for mexer nesse arquivo precisa entender transação e SQL. Por isso
-  deixei o código bem comentado.
+  deixei o código bem comentado;
+- um livro muito disputado pode virar gargalo. É o preço de não emprestar o
+  mesmo exemplar duas vezes.
 
 ## Como conferir
 
