@@ -1,21 +1,22 @@
 #!/bin/sh
-# Entrypoint do container de produção.
+# Sobe a aplicação em produção:
+#   1. aplica as migrações do banco (idempotente: `upgrade head` não repete o
+#      que já foi aplicado);
+#   2. entrega o processo ao Gunicorn.
 #
-# Responsabilidades:
-#   1. aplicar as migrations pendentes do Prisma;
-#   2. iniciar a API.
-#
-# Por que rodar migration no start? Em um deploy no Coolify não temos um passo
-# separado garantido. O `migrate deploy` é idempotente: se não há nada novo,
-# ele apenas não faz nada. É seguro rodar a cada boot.
-#
-# Se a migration falhar, o container morre (set -e) em vez de subir uma API
-# incompatível com o banco. Isso é proposital.
+# `exec` é importante: o Gunicorn passa a ser o PID 1 e recebe o SIGTERM do
+# Docker/Coolify diretamente, encerrando sem deixar requisição pela metade.
+set -eu
 
-set -e
+echo "==> Aplicando migrações (alembic upgrade head)"
+alembic upgrade head
 
-echo "[entrypoint] aplicando migrations..."
-./node_modules/.bin/prisma migrate deploy
-
-echo "[entrypoint] iniciando API..."
-exec node dist/server.js
+echo "==> Iniciando Gunicorn na porta ${PORT:-3000}"
+exec gunicorn \
+  --bind "0.0.0.0:${PORT:-3000}" \
+  --workers "${GUNICORN_WORKERS:-2}" \
+  --threads "${GUNICORN_THREADS:-4}" \
+  --timeout 60 \
+  --access-logfile - \
+  --error-logfile - \
+  "app:create_app()"

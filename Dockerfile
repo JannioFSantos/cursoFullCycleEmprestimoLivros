@@ -1,69 +1,55 @@
-# ---------------------------------------------------------------------------
 # Imagem de produção da API.
 #
-# Multi-stage:
-#   1. build   -> instala TUDO (inclui devDependencies) e compila TypeScript
-#   2. runtime -> instala só dependências de produção e copia o dist pronto
-#
-# Isso mantém a imagem final menor e sem as ferramentas de teste/lint.
-# ---------------------------------------------------------------------------
+# Duas etapas: uma instala as dependências, a outra leva só o necessário para
+# rodar. Isso mantém a imagem final pequena e sem compilador.
 
-# ---------- Estágio 1: build ----------
-FROM node:22-alpine AS build
+FROM python:3.12-slim AS dependencias
 
-WORKDIR /app
-
-# openssl é exigido pelos engines do Prisma.
-RUN apk add --no-cache openssl
-
-# Copiamos primeiro só os manifests para aproveitar o cache de camadas:
-# se o código mudar mas as dependências não, o npm ci não roda de novo.
-COPY package.json package-lock.json ./
-RUN npm ci
-
-COPY tsconfig.json tsconfig.build.json ./
-COPY prisma ./prisma
-RUN npx prisma generate
-
-COPY src ./src
-RUN npm run build
-
-# ---------- Estágio 2: runtime ----------
-FROM node:22-alpine AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-RUN apk add --no-cache openssl
+# Só o requirements entra antes do código: assim o cache do Docker não é
+# invalidado a cada mudança em um arquivo .py.
+COPY requirements.txt ./
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-ENV NODE_ENV=production
+# ------------------------------ imagem final ------------------------------
+FROM python:3.12-slim AS runtime
 
-# Só dependências de produção. O Prisma CLI está em "dependencies" porque é
-# ele que roda `prisma migrate deploy` na inicialização do container.
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
-COPY prisma ./prisma
-RUN npx prisma generate
+# curl é usado pelo HEALTHCHECK do Compose/Coolify.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=build /app/dist ./dist
-# O Swagger UI lê este arquivo em tempo de execução (rota /API/docs).
-COPY docs ./docs
-# A tela de demonstração (/) também é lida em tempo de execução.
-COPY public ./public
-COPY scripts/entrypoint.sh ./scripts/entrypoint.sh
-RUN chmod +x ./scripts/entrypoint.sh
+# Usuário sem privilégios: se alguém entrar no container, não é root.
+RUN useradd --create-home --uid 10001 app
 
-# Rodar como usuário sem privilégios é uma boa prática de segurança.
-USER node
+WORKDIR /app
 
-ENV PORT=3000
-ENV HOST=0.0.0.0
+COPY --from=dependencias /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=dependencias /usr/local/bin /usr/local/bin
+
+COPY app ./app
+COPY migrations ./migrations
+COPY alembic.ini ./
+COPY docs/openapi.yaml ./docs/openapi.yaml
+COPY scripts ./scripts
+
+RUN chmod +x scripts/entrypoint.sh && chown -R app:app /app
+
+USER app
 
 EXPOSE 3000
 
-# O Coolify também pode usar este HEALTHCHECK. Se /health devolver 503
-# (banco fora), o container é considerado unhealthy.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost:3000/health || exit 1
 
-ENTRYPOINT ["./scripts/entrypoint.sh"]
+# Gunicorn sobe via scripts/entrypoint.sh, que antes aplica as migrações.
+CMD ["./scripts/entrypoint.sh"]

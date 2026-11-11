@@ -4,6 +4,7 @@
 #
 # A API fica em http://localhost:3000 e o banco em localhost:5432.
 # Os dados do Postgres ficam no volume "dados_postgres" (sobrevivem ao down).
+# O entrypoint do container aplica `alembic upgrade head` antes de subir.
 
 services:
   db:
@@ -14,7 +15,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: biblioteca
     ports:
-      # exposto só para você conseguir rodar `npm run db:deploy` da máquina
+      # Exposto para rodar as migrações/testes da máquina host.
       - '5432:5432'
     volumes:
       - dados_postgres:/var/lib/postgresql/data
@@ -29,12 +30,14 @@ services:
     build: .
     container_name: biblioteca-api
     environment:
-      NODE_ENV: production
+      APP_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
       LOG_LEVEL: info
       # Dentro do Compose, o host do banco é o nome do serviço: "db".
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/biblioteca?schema=public
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/biblioteca
+      # Troque em produção: assina o cookie de sessão da tela demo.
+      SECRET_KEY: ${SECRET_KEY:-troque-esta-chave-em-producao}
       PRAZO_DIAS: 14
       LIMITE_EMPRESTIMOS: 3
     ports:

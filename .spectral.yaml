@@ -1,8 +1,0 @@
-# Regras usadas para validar o docs/openapi.yaml no CI.
-# "spectral:oas" é o conjunto oficial de boas práticas para OpenAPI.
-extends:
-  - 'spectral:oas'
-
-rules:
-  # O projeto ainda não publica SDK, então não exigimos exemplos em toda resposta.
-  oas3-valid-media-example: off

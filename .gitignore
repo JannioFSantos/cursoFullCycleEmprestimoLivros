@@ -1,7 +1,16 @@
-# Dependências e artefatos de build
-node_modules/
-dist/
-coverage/
+# Ambientes virtuais e caches do Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
 
 # Variáveis de ambiente reais NUNCA vão para o repositório.
 # O arquivo .env.example (sem segredos) é o que fica versionado.
@@ -11,10 +20,13 @@ coverage/
 
 # Logs e arquivos do sistema
 *.log
-npm-debug.log*
 .DS_Store
 Thumbs.db
 
 # Editor
 .vscode/
 .idea/
+
+# Resultados do Locust
+locust/locust.conf
+locust-report*.html
