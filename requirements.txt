@@ -1,0 +1,16 @@
+# Dependências de produção.
+#
+# Versões fixadas para o build do Docker ser reproduzível. Para atualizar,
+# rode os testes e o teste de carga antes de mudar qualquer linha.
+
+Flask==3.1.2
+SQLAlchemy==2.0.41
+psycopg[binary]==3.2.10
+alembic==1.16.2
+pydantic==2.13.5
+email-validator==2.3.0
+python-dotenv==1.1.1
+prometheus-client==0.26.0
+flask-swagger-ui==5.34.1
+PyYAML==6.0.3
+gunicorn==23.0.0

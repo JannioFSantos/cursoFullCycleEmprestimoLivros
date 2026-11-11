@@ -1,0 +1,8 @@
+# Dependências de desenvolvimento e de CI (inclui as de produção).
+-r requirements.txt
+
+pytest==8.4.2
+pytest-cov==7.1.0
+ruff==0.17.4
+locust==2.47.0
+openapi-spec-validator==0.7.2
