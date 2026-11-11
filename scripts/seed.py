@@ -16,16 +16,21 @@ from app.infra.banco import criar_engine, criar_session_factory
 from app.infra.modelos import LivroModelo, UsuarioModelo, agora_utc
 
 LIVROS = [
-    ("Dom Casmurro", "Machado de Assis", "9788535910663", 3),
-    ("Grande Sertão: Veredas", "João Guimarães Rosa", "9788520925152", 2),
-    ("Vidas Secas", "Graciliano Ramos", "9788503012039", 2),
-    ("Memórias Póstumas de Brás Cubas", "Machado de Assis", "9788594318606", 1),
-    ("O Cortiço", "Aluísio Azevedo", "9788508042741", 2),
-    ("Capitães da Areia", "Jorge Amado", "9788535911691", 1),
-    ("A Hora da Estrela", "Clarice Lispector", "9788520932389", 2),
-    ("Sagarana", "João Guimarães Rosa", "9788520923547", 1),
-    ("Quarto de Despejo", "Carolina Maria de Jesus", "9788508172868", 1),
-    ("Torto Arado", "Itamar Vieira Junior", "9788580556267", 4),
+    ("Código Limpo", "Robert C. Martin", "9788576082675", 3),
+    ("Arquitetura Limpa", "Robert C. Martin", "9788550804606", 3),
+    ("O Programador Pragmático", "Andrew Hunt e David Thomas", "9788582605407", 2),
+    ("Refatoração", "Martin Fowler", "9788577804130", 2),
+    ("Domain-Driven Design", "Eric Evans", "9780321125217", 2),
+    (
+        "Padrões de Projeto",
+        "Erich Gamma, Richard Helm, Ralph Johnson e John Vlissides",
+        "9788577807006",
+        1,
+    ),
+    ("Entendendo Algoritmos", "Aditya Bhargava", "9788575225639", 2),
+    ("Use a Cabeça! Python", "Paul Barry", "9788576081746", 1),
+    ("Docker em Ação", "Jeff Nickoloff", "9788575225093", 1),
+    ("Kubernetes em Ação", "Marko Lukša", "9788575227056", 1),
 ]
 
 USUARIOS = [
