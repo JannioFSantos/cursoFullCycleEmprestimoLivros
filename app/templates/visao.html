@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titulo %}Visão geral{% endblock %}
+
+{% block conteudo %}
+<section class="cartoes">
+  <article class="cartao">
+    <p class="rotulo">Livros no catálogo</p>
+    <p class="valor">{{ total_livros }}</p>
+    <p class="ajuda">{{ total_exemplares }} exemplar(es) no total</p>
+  </article>
+  <article class="cartao">
+    <p class="rotulo">Exemplares disponíveis</p>
+    <p class="valor verde">{{ total_disponiveis }}</p>
+    <p class="ajuda">contados a partir dos empréstimos ativos</p>
+  </article>
+  <article class="cartao">
+    <p class="rotulo">Empréstimos ativos</p>
+    <p class="valor">{{ total_ativos }}</p>
+    <p class="ajuda">prazo padrão de {{ config.PRAZO_DIAS }} dias</p>
+  </article>
+  <article class="cartao">
+    <p class="rotulo">Em atraso</p>
+    <p class="valor vermelho">{{ total_atrasados }}</p>
+    <p class="ajuda">venceu antes de hoje</p>
+  </article>
+</section>
+
+<section class="painel">
+  <h2>Como usar esta demonstração</h2>
+  <p class="ajuda">
+    Cada aba usa formulários HTML comuns. O navegador envia um POST, o Flask
+    executa o mesmo caso de uso da API e redireciona de volta para a lista.
+  </p>
+  <div class="passos">
+    <div class="passo">
+      <strong>1. Cadastre um livro</strong>
+      Informe título, autor, ISBN e quantos exemplares a biblioteca possui.
+    </div>
+    <div class="passo">
+      <strong>2. Cadastre um usuário</strong>
+      Nome e e-mail. O e-mail é único no banco.
+    </div>
+    <div class="passo">
+      <strong>3. Registre um empréstimo</strong>
+      Escolha um livro com exemplar disponível e um usuário sem atraso.
+    </div>
+    <div class="passo">
+      <strong>4. Devolva o livro</strong>
+      A devolução libera o exemplar na hora e mantém o histórico.
+    </div>
+  </div>
+</section>
+
+<section class="painel">
+  <h2>Últimos empréstimos</h2>
+  {% if ultimos %}
+    <div class="tabela-area">
+      <table>
+        <thead>
+          <tr>
+            <th>Livro</th>
+            <th>Usuário</th>
+            <th>Empréstimo</th>
+            <th>Prevista</th>
+            <th>Situação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for emprestimo in ultimos %}
+            <tr>
+              <td>{{ emprestimo.livro.titulo }}</td>
+              <td>{{ emprestimo.usuario.nome }}</td>
+              <td>{{ emprestimo.data_emprestimo | data }}</td>
+              <td>{{ emprestimo.data_prevista | data }}</td>
+              <td>
+                {% if emprestimo.status.value == 'DEVOLVIDO' %}
+                  <span class="etiqueta devolvido">Devolvido</span>
+                {% elif esta_atrasado(emprestimo, hoje) %}
+                  <span class="etiqueta atrasado">Atrasado</span>
+                {% else %}
+                  <span class="etiqueta ativo">Ativo</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="vazio">Nenhum empréstimo registrado ainda.</p>
+  {% endif %}
+</section>
+{% endblock %}

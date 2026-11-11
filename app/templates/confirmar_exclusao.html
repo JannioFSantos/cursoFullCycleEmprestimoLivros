@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+
+{% block conteudo %}
+<section class="painel">
+  <h2>{{ titulo }}</h2>
+  <p class="ajuda">{{ descricao }}</p>
+  <p>
+    <strong>{{ nome }}</strong><br>
+    <span class="vazio">{{ detalhe }}</span>
+  </p>
+  <form method="post" action="{{ acao }}">
+    <div class="dialogo-acoes">
+      <a class="botao secundario" href="{{ voltar }}">Cancelar</a>
+      <button class="botao perigo" type="submit">Confirmar exclusão</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

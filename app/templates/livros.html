@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block titulo %}Livros{% endblock %}
+
+{% block conteudo %}
+<section class="painel">
+  <h2>Cadastrar livro</h2>
+  <p class="ajuda">
+    O ISBN é único: tentar cadastrar duas vezes devolve uma mensagem de erro.
+  </p>
+  <form class="formulario" method="post" action="{{ url_for('demo.criar_livro') }}">
+    <div class="campo">
+      <label for="livro-titulo">Título</label>
+      <input id="livro-titulo" name="titulo" maxlength="200" required
+             placeholder="Dom Casmurro">
+    </div>
+    <div class="campo">
+      <label for="livro-autor">Autor</label>
+      <input id="livro-autor" name="autor" maxlength="200" required
+             placeholder="Machado de Assis">
+    </div>
+    <div class="campo">
+      <label for="livro-isbn">ISBN</label>
+      <input id="livro-isbn" name="isbn" minlength="10" maxlength="20" required
+             placeholder="9788535910663">
+    </div>
+    <div class="campo">
+      <label for="livro-exemplares">Exemplares</label>
+      <input id="livro-exemplares" name="exemplares" type="number" min="1"
+             max="10000" required placeholder="1">
+    </div>
+    <button class="botao" type="submit">Cadastrar</button>
+  </form>
+</section>
+
+<section class="painel">
+  <h2>Catálogo</h2>
+  {% if livros %}
+    <div class="tabela-area">
+      <table>
+        <thead>
+          <tr>
+            <th>Título</th>
+            <th>Autor</th>
+            <th>ISBN</th>
+            <th>Total</th>
+            <th>Emprestados</th>
+            <th>Disponíveis</th>
+            <th>Situação</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for livro in livros %}
+            <tr>
+              <td>{{ livro.titulo }}</td>
+              <td>{{ livro.autor }}</td>
+              <td>{{ livro.isbn }}</td>
+              <td>{{ livro.exemplares_total }}</td>
+              <td>{{ livro.emprestimos_ativos }}</td>
+              <td>{{ livro.exemplares_disponiveis }}</td>
+              <td>
+                {% if livro.exemplares_disponiveis > 0 %}
+                  <span class="etiqueta disponivel">Disponível</span>
+                {% else %}
+                  <span class="etiqueta esgotado">Esgotado</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="acoes-tabela">
+                  <a class="botao pequeno secundario"
+                     href="{{ url_for('demo.editar_livro', livro_id=livro.id) }}">Editar</a>
+                  <a class="botao pequeno perigo"
+                     href="{{ url_for('demo.confirmar_exclusao_de_livro', livro_id=livro.id) }}">Excluir</a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="vazio">Nenhum livro cadastrado. Use o formulário acima.</p>
+  {% endif %}
+</section>
+{% endblock %}

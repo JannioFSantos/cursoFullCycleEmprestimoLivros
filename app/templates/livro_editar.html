@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block titulo %}Editar livro{% endblock %}
+
+{% block conteudo %}
+<section class="painel">
+  <h2>Editar livro</h2>
+  <p class="ajuda">
+    Não é possível reduzir o total de exemplares abaixo do número de
+    empréstimos ativos.
+  </p>
+  <form class="formulario" method="post"
+        action="{{ url_for('demo.salvar_livro', livro_id=livro.id) }}">
+    <div class="campo">
+      <label for="editar-livro-titulo">Título</label>
+      <input id="editar-livro-titulo" name="titulo" maxlength="200" required
+             value="{{ livro.titulo }}">
+    </div>
+    <div class="campo">
+      <label for="editar-livro-autor">Autor</label>
+      <input id="editar-livro-autor" name="autor" maxlength="200" required
+             value="{{ livro.autor }}">
+    </div>
+    <div class="campo">
+      <label for="editar-livro-isbn">ISBN</label>
+      <input id="editar-livro-isbn" name="isbn" minlength="10" maxlength="20" required
+             value="{{ livro.isbn }}">
+    </div>
+    <div class="campo">
+      <label for="editar-livro-exemplares">Exemplares</label>
+      <input id="editar-livro-exemplares" name="exemplares" type="number"
+             min="1" max="10000" required value="{{ livro.exemplares_total }}">
+    </div>
+    <button class="botao" type="submit">Salvar</button>
+  </form>
+  <div class="dialogo-acoes">
+    <a class="botao secundario" href="{{ url_for('demo.livros') }}">Cancelar</a>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block titulo %}Empréstimos{% endblock %}
+
+{% block conteudo %}
+<section class="painel">
+  <h2>Registrar empréstimo</h2>
+  <p class="ajuda">
+    Só aparecem livros com exemplar disponível. Se o usuário estiver em atraso
+    ou já tiver {{ config.LIMITE_EMPRESTIMOS }} empréstimos ativos, a operação
+    é recusada com uma mensagem explicando o motivo.
+  </p>
+  <form class="formulario" method="post" action="{{ url_for('demo.criar_emprestimo') }}">
+    <div class="campo">
+      <label for="emprestimo-livro">Livro</label>
+      <select id="emprestimo-livro" name="livro_id" required>
+        <option value="">Selecione um livro</option>
+        {% for livro in livros_disponiveis %}
+          <option value="{{ livro.id }}">
+            {{ livro.titulo }} ({{ livro.exemplares_disponiveis }} disponível(is))
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="campo">
+      <label for="emprestimo-usuario">Usuário</label>
+      <select id="emprestimo-usuario" name="usuario_id" required>
+        <option value="">Selecione um usuário</option>
+        {% for usuario in usuarios %}
+          <option value="{{ usuario.id }}">{{ usuario.nome }} — {{ usuario.email }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="botao" type="submit">Emprestar</button>
+  </form>
+  {% if not livros_disponiveis or not usuarios %}
+    <p class="ajuda">
+      Para emprestar, cadastre ao menos um livro com exemplar disponível e um
+      usuário.
+    </p>
+  {% endif %}
+</section>
+
+<section class="painel">
+  <h2>Histórico</h2>
+  {% if emprestimos %}
+    <div class="tabela-area">
+      <table>
+        <thead>
+          <tr>
+            <th>Livro</th>
+            <th>Usuário</th>
+            <th>Empréstimo</th>
+            <th>Prevista</th>
+            <th>Devolução</th>
+            <th>Situação</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for emprestimo in emprestimos %}
+            <tr>
+              <td>
+                {{ emprestimo.livro.titulo }}
+                {% if emprestimo.livro.excluido_em %}
+                  <span class="etiqueta removido">fora do catálogo</span>
+                {% endif %}
+              </td>
+              <td>
+                {{ emprestimo.usuario.nome }}
+                {% if emprestimo.usuario.excluido_em %}
+                  <span class="etiqueta removido">removido</span>
+                {% endif %}
+              </td>
+              <td>{{ emprestimo.data_emprestimo | data }}</td>
+              <td>{{ emprestimo.data_prevista | data }}</td>
+              <td>{{ emprestimo.data_devolucao | data }}</td>
+              <td>
+                {% if emprestimo.status.value == 'DEVOLVIDO' %}
+                  <span class="etiqueta devolvido">Devolvido</span>
+                {% elif esta_atrasado(emprestimo, hoje) %}
+                  <span class="etiqueta atrasado">
+                    Atrasado há {{ dias_de_atraso(emprestimo.data_prevista, hoje) }} dia(s)
+                  </span>
+                {% else %}
+                  <span class="etiqueta ativo">Ativo</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if emprestimo.status.value == 'ATIVO' %}
+                  <form method="post"
+                        action="{{ url_for('demo.devolver', emprestimo_id=emprestimo.id) }}">
+                    <input type="hidden" name="voltar" value="{{ url_for('demo.emprestimos') }}">
+                    <button class="botao pequeno" type="submit">Devolver</button>
+                  </form>
+                {% else %}
+                  <span class="vazio">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="vazio">Nenhum empréstimo registrado ainda.</p>
+  {% endif %}
+</section>
+{% endblock %}

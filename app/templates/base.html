@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Biblioteca{% endblock %} — demonstração da API</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header class="topo">
+    <div>
+      <h1>Biblioteca</h1>
+      <p>Empréstimo de livros em Flask + SQLAlchemy, sem JavaScript no navegador</p>
+    </div>
+    <a class="estado-api ok" href="{{ url_for('demo.visao') }}">API em /API</a>
+  </header>
+
+  <nav class="abas">
+    <a class="{{ 'ativa' if aba_ativa == 'visao' else '' }}"
+       href="{{ url_for('demo.visao') }}">Visão geral</a>
+    <a class="{{ 'ativa' if aba_ativa == 'livros' else '' }}"
+       href="{{ url_for('demo.livros') }}">Livros</a>
+    <a class="{{ 'ativa' if aba_ativa == 'usuarios' else '' }}"
+       href="{{ url_for('demo.usuarios') }}">Usuários</a>
+    <a class="{{ 'ativa' if aba_ativa == 'emprestimos' else '' }}"
+       href="{{ url_for('demo.emprestimos') }}">Empréstimos</a>
+    <a class="{{ 'ativa' if aba_ativa == 'atrasados' else '' }}"
+       href="{{ url_for('demo.atrasados') }}">Atrasados</a>
+  </nav>
+
+  <main>
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+      {% if mensagens %}
+        <div class="mensagens">
+          {% for categoria, texto in mensagens %}
+            <p class="mensagem {{ categoria }}">{{ texto }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block conteudo %}{% endblock %}
+  </main>
+
+  <footer class="rodape">
+    Documentação interativa em <a href="/API/docs">/API/docs</a> ·
+    contrato em <a href="/API/openapi.yaml">/API/openapi.yaml</a> ·
+    métricas em <a href="/API/metrics">/API/metrics</a>
+  </footer>
+</body>
+</html>

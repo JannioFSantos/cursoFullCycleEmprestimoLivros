@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block titulo %}Usuários{% endblock %}
+
+{% block conteudo %}
+<section class="painel">
+  <h2>Cadastrar usuário</h2>
+  <p class="ajuda">O e-mail é único no banco de dados.</p>
+  <form class="formulario" method="post" action="{{ url_for('demo.criar_usuario') }}">
+    <div class="campo">
+      <label for="usuario-nome">Nome</label>
+      <input id="usuario-nome" name="nome" maxlength="200" required
+             placeholder="Ana Souza">
+    </div>
+    <div class="campo">
+      <label for="usuario-email">E-mail</label>
+      <input id="usuario-email" name="email" type="email" maxlength="200" required
+             placeholder="ana@exemplo.com">
+    </div>
+    <button class="botao" type="submit">Cadastrar</button>
+  </form>
+</section>
+
+<section class="painel">
+  <h2>Usuários cadastrados</h2>
+  {% if usuarios %}
+    <div class="tabela-area">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Cadastro</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for usuario in usuarios %}
+            <tr>
+              <td>{{ usuario.nome }}</td>
+              <td>{{ usuario.email }}</td>
+              <td>{{ usuario.criado_em | data }}</td>
+              <td>
+                <div class="acoes-tabela">
+                  <a class="botao pequeno secundario"
+                     href="{{ url_for('demo.editar_usuario', usuario_id=usuario.id) }}">Editar</a>
+                  <a class="botao pequeno perigo"
+                     href="{{ url_for('demo.confirmar_exclusao_de_usuario', usuario_id=usuario.id) }}">Excluir</a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="vazio">Nenhum usuário cadastrado. Use o formulário acima.</p>
+  {% endif %}
+</section>
+{% endblock %}

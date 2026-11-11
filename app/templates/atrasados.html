@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Atrasados{% endblock %}
+
+{% block conteudo %}
+<section class="painel">
+  <h2>Empréstimos em atraso</h2>
+  <p class="ajuda">
+    Um livro que vence hoje ainda não está atrasado. Quem tem empréstimo em
+    atraso não pode pegar outro livro até devolver.
+  </p>
+  {% if emprestimos %}
+    <div class="tabela-area">
+      <table>
+        <thead>
+          <tr>
+            <th>Livro</th>
+            <th>Usuário</th>
+            <th>E-mail</th>
+            <th>Prevista</th>
+            <th>Atraso</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for emprestimo in emprestimos %}
+            <tr>
+              <td>{{ emprestimo.livro.titulo }}</td>
+              <td>{{ emprestimo.usuario.nome }}</td>
+              <td>{{ emprestimo.usuario.email }}</td>
+              <td>{{ emprestimo.data_prevista | data }}</td>
+              <td>
+                <span class="etiqueta atrasado">
+                  {{ dias_de_atraso(emprestimo.data_prevista, hoje) }} dia(s)
+                </span>
+              </td>
+              <td>
+                <form method="post"
+                      action="{{ url_for('demo.devolver', emprestimo_id=emprestimo.id) }}">
+                  <input type="hidden" name="voltar" value="{{ url_for('demo.atrasados') }}">
+                  <button class="botao pequeno" type="submit">Devolver</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="vazio">Nenhum empréstimo em atraso. 🎉</p>
+  {% endif %}
+</section>
+{% endblock %}

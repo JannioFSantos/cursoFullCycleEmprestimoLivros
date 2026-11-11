@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}Editar usuário{% endblock %}
+
+{% block conteudo %}
+<section class="painel">
+  <h2>Editar usuário</h2>
+  <p class="ajuda">O e-mail precisa continuar único no banco.</p>
+  <form class="formulario" method="post"
+        action="{{ url_for('demo.salvar_usuario', usuario_id=usuario.id) }}">
+    <div class="campo">
+      <label for="editar-usuario-nome">Nome</label>
+      <input id="editar-usuario-nome" name="nome" maxlength="200" required
+             value="{{ usuario.nome }}">
+    </div>
+    <div class="campo">
+      <label for="editar-usuario-email">E-mail</label>
+      <input id="editar-usuario-email" name="email" type="email" maxlength="200"
+             required value="{{ usuario.email }}">
+    </div>
+    <button class="botao" type="submit">Salvar</button>
+  </form>
+  <div class="dialogo-acoes">
+    <a class="botao secundario" href="{{ url_for('demo.usuarios') }}">Cancelar</a>
+  </div>
+</section>
+{% endblock %}

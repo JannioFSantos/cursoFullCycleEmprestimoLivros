@@ -1,0 +1,433 @@
+/* ------------------------------------------------------------------
+   Estilo simples, sem framework e sem CDN.
+   A ideia é a página abrir rápido em qualquer lugar, inclusive no
+   servidor do Coolify.
+   ------------------------------------------------------------------ */
+:root {
+  --azul: #1f4e79;
+  --azul-claro: #e8f1fa;
+  --verde: #1e7a46;
+  --verde-claro: #e6f4ec;
+  --vermelho: #a52727;
+  --vermelho-claro: #fdeaea;
+  --amarelo: #8a6100;
+  --amarelo-claro: #fff4d6;
+  --texto: #1d2733;
+  --texto-fraco: #5b6b7c;
+  --borda: #d6dee7;
+  --fundo: #f4f7fa;
+  --branco: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  background: var(--fundo);
+  color: var(--texto);
+  line-height: 1.5;
+}
+
+.topo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: var(--azul);
+  color: #fff;
+}
+
+.topo h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.topo p {
+  margin: 2px 0 0;
+  color: #cfe0f2;
+  font-size: 0.92rem;
+}
+
+.estado-api {
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #ffffff22;
+  border: 1px solid #ffffff55;
+}
+
+.estado-api.ok {
+  background: var(--verde-claro);
+  border-color: var(--verde);
+  color: var(--verde);
+}
+
+.estado-api.erro {
+  background: var(--vermelho-claro);
+  border-color: var(--vermelho);
+  color: var(--vermelho);
+}
+
+.abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 14px 24px 0;
+  background: var(--branco);
+  border-bottom: 1px solid var(--borda);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.abas a {
+  appearance: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--texto-fraco);
+  padding: 10px 16px;
+  border-radius: 8px 8px 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.abas a:hover {
+  background: var(--azul-claro);
+  color: var(--azul);
+}
+
+.abas a.ativa {
+  background: var(--fundo);
+  border-color: var(--borda);
+  color: var(--azul);
+  margin-bottom: -1px;
+}
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.aba {
+  display: none;
+}
+
+.aba.ativa {
+  display: block;
+}
+
+.cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.cartao {
+  background: var(--branco);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.cartao .rotulo {
+  color: var(--texto-fraco);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cartao .valor {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--azul);
+}
+
+.cartao .valor.verde {
+  color: var(--verde);
+}
+
+.cartao .valor.vermelho {
+  color: var(--vermelho);
+}
+
+.painel {
+  background: var(--branco);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.painel h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+  color: var(--azul);
+}
+
+.painel .ajuda {
+  margin: 0 0 16px;
+  color: var(--texto-fraco);
+  font-size: 0.9rem;
+}
+
+.formulario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.campo label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texto-fraco);
+}
+
+.campo input,
+.campo select {
+  padding: 10px 12px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--texto);
+}
+
+.campo input:focus,
+.campo select:focus {
+  outline: 2px solid var(--azul);
+  outline-offset: 1px;
+}
+
+.botao {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--azul);
+  color: #fff;
+}
+
+.botao:hover {
+  filter: brightness(1.08);
+}
+
+.botao.secundario {
+  background: transparent;
+  color: var(--azul);
+  border: 1px solid var(--azul);
+}
+
+.botao.pequeno {
+  padding: 5px 10px;
+  font-size: 0.8rem;
+}
+
+.botao.perigo {
+  background: var(--vermelho);
+}
+
+.acoes-tabela {
+  display: flex;
+  gap: 6px;
+}
+
+.botao:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tabela-area {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--borda);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--texto-fraco);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+tbody tr:hover {
+  background: #f8fbfe;
+}
+
+.vazio {
+  color: var(--texto-fraco);
+  font-style: italic;
+}
+
+.etiqueta {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.etiqueta.ativo {
+  background: var(--azul-claro);
+  color: var(--azul);
+}
+
+.etiqueta.devolvido {
+  background: var(--verde-claro);
+  color: var(--verde);
+}
+
+.etiqueta.atrasado {
+  background: var(--vermelho-claro);
+  color: var(--vermelho);
+}
+
+.etiqueta.disponivel {
+  background: var(--verde-claro);
+  color: var(--verde);
+}
+
+.etiqueta.esgotado {
+  background: var(--amarelo-claro);
+  color: var(--amarelo);
+}
+
+.etiqueta.removido {
+  background: #eceff3;
+  color: var(--texto-fraco);
+}
+
+dialog {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  width: min(540px, calc(100vw - 32px));
+  box-shadow: 0 18px 60px #00000055;
+}
+
+dialog::backdrop {
+  background: #00000066;
+}
+
+.dialogo-conteudo {
+  padding: 22px;
+}
+
+.dialogo-conteudo h2 {
+  margin: 0 0 4px;
+  color: var(--azul);
+}
+
+.dialogo-conteudo .ajuda {
+  margin: 0 0 16px;
+  color: var(--texto-fraco);
+  font-size: 0.9rem;
+}
+
+.dialogo-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.passos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.passo {
+  border: 1px dashed var(--borda);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.passo strong {
+  display: block;
+  color: var(--azul);
+}
+
+
+
+
+.rodape {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 8px 24px 32px;
+  color: var(--texto-fraco);
+  font-size: 0.85rem;
+}
+
+.rodape a {
+  color: var(--azul);
+}
+
+/* Mensagens flash (substituem os "toasts" que a versão JavaScript usava). */
+.mensagens {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.mensagem {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--borda);
+  background: var(--branco);
+  font-size: 0.92rem;
+}
+
+.mensagem.sucesso {
+  background: var(--verde-claro);
+  border-color: var(--verde);
+  color: var(--verde);
+}
+
+.mensagem.erro {
+  background: var(--vermelho-claro);
+  border-color: var(--vermelho);
+  color: var(--vermelho);
+}
+
+.cartao .ajuda,
+.painel .ajuda {
+  margin: 4px 0 0;
+  color: var(--texto-fraco);
+  font-size: 0.85rem;
+}
+
