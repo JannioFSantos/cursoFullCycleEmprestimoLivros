@@ -38,6 +38,8 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/biblioteca
       # Troque em produção: assina o cookie de sessão da tela demo.
       SECRET_KEY: ${SECRET_KEY:-troque-esta-chave-em-producao}
+      # Cria os dados de exemplo que ainda não existem (idempotente).
+      SEED_ON_START: ${SEED_ON_START:-true}
       PRAZO_DIAS: 14
       LIMITE_EMPRESTIMOS: 3
     ports:

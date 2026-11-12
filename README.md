@@ -81,7 +81,9 @@ Agora abra `http://localhost:3000` no navegador. Essa é a tela de
 demonstração. A API em si fica em `http://localhost:3000/API`.
 
 Quando o container da API inicia, ele roda as migrations sozinho
-(`alembic upgrade head`). Não precisa rodar nada à mão.
+(`alembic upgrade head`) e garante os dados de exemplo com um seed idempotente
+(`python -m scripts.seed`). Não precisa rodar nada à mão. Se o banco já tiver
+dados reais e você não quiser os exemplos, defina `SEED_ON_START=false`.
 
 Para ver os logs:
 
@@ -405,6 +407,7 @@ Variáveis necessárias:
 | `LOG_LEVEL` | `info` |
 | `DATABASE_URL` | URL interna do PostgreSQL |
 | `SECRET_KEY` | valor aleatório, marcado como secret |
+| `SEED_ON_START` | `true` (cria os dados de exemplo; use `false` com dados reais) |
 | `PRAZO_DIAS` | `14` |
 | `LIMITE_EMPRESTIMOS` | `3` |
 

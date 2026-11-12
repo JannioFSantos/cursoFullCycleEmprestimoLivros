@@ -51,6 +51,7 @@ Na aba **Environment Variables**, cadastre:
 | `LOG_LEVEL` | `info` |
 | `DATABASE_URL` | a URL interna do passo 2 (marque como secret) |
 | `SECRET_KEY` | valor aleatório, marcado como secret |
+| `SEED_ON_START` | `true` (cria os dados de exemplo; use `false` com dados reais) |
 | `PRAZO_DIAS` | `14` |
 | `LIMITE_EMPRESTIMOS` | `3` |
 
@@ -86,7 +87,8 @@ Clique em **Deploy**. O que acontece:
 2. roda o build do Dockerfile;
 3. inicia o container;
 4. o `scripts/entrypoint.sh` roda `alembic upgrade head`;
-5. o Gunicorn começa a escutar na porta 3000.
+5. o entrypoint roda `python -m scripts.seed` (só cria o que ainda não existe);
+6. o Gunicorn começa a escutar na porta 3000.
 
 Se a migration falhar, o container não sobe. Fiz assim de propósito: é melhor
 falhar no deploy do que rodar uma API com o banco desatualizado.
