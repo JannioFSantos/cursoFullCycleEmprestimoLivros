@@ -252,6 +252,12 @@ class EmprestimoRepositorioFake:
             and inicio_do_dia(emprestimo.data_prevista) < hoje
             for emprestimo in self.emprestimos
         )
+        ja_tem_emprestimo_do_livro = any(
+            emprestimo.livro_id == dados.livro_id
+            and emprestimo.usuario_id == dados.usuario_id
+            and emprestimo.status == StatusEmprestimo.ATIVO
+            for emprestimo in self.emprestimos
+        )
 
         # Mesma função pura usada em produção.
         validar(
@@ -260,6 +266,7 @@ class EmprestimoRepositorioFake:
                 emprestimos_ativos_do_livro=ativos_do_livro,
                 emprestimos_ativos_do_usuario=ativos_do_usuario,
                 usuario_tem_atraso=tem_atraso,
+                usuario_ja_tem_emprestimo_do_livro=ja_tem_emprestimo_do_livro,
             )
         )
 

@@ -69,6 +69,14 @@ class _Erros:
         )
 
     @staticmethod
+    def emprestimo_duplicado() -> ErroDeDominio:
+        return ErroDeDominio(
+            "EMPRESTIMO_DUPLICADO",
+            "O usuário já tem um empréstimo ativo deste livro.",
+            409,
+        )
+
+    @staticmethod
     def usuario_com_atraso() -> ErroDeDominio:
         return ErroDeDominio(
             "USUARIO_COM_ATRASO",

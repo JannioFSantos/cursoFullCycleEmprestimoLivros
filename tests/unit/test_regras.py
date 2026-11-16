@@ -111,6 +111,24 @@ def test_recusa_quando_nao_ha_exemplar_disponivel():
     assert codigo_do_erro(lambda: validar_emprestimo(estado)) == "LIVRO_INDISPONIVEL"
 
 
+def test_recusa_quando_o_usuario_ja_tem_emprestimo_do_mesmo_livro():
+    estado = EstadoParaEmprestar(
+        **{**ESTADO_BASE, "usuario_ja_tem_emprestimo_do_livro": True}
+    )
+    assert codigo_do_erro(lambda: validar_emprestimo(estado)) == "EMPRESTIMO_DUPLICADO"
+
+
+def test_duplicidade_tem_prioridade_sobre_a_falta_de_exemplar():
+    estado = EstadoParaEmprestar(
+        **{
+            **ESTADO_BASE,
+            "emprestimos_ativos_do_livro": 1,
+            "usuario_ja_tem_emprestimo_do_livro": True,
+        }
+    )
+    assert codigo_do_erro(lambda: validar_emprestimo(estado)) == "EMPRESTIMO_DUPLICADO"
+
+
 def test_recusa_usuario_com_emprestimo_em_atraso():
     estado = EstadoParaEmprestar(**{**ESTADO_BASE, "usuario_tem_atraso": True})
     assert codigo_do_erro(lambda: validar_emprestimo(estado)) == "USUARIO_COM_ATRASO"

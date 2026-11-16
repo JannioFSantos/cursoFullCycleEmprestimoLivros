@@ -167,6 +167,28 @@ def test_recusa_o_segundo_emprestimo_quando_so_existe_um_exemplar(
     assert resposta.get_json()["erro"]["codigo"] == "LIVRO_INDISPONIVEL"
 
 
+def test_recusa_o_mesmo_livro_para_o_mesmo_usuario_mesmo_com_exemplar_livre(
+    cliente, criar_livro, criar_usuario, emprestar
+):
+    # Dois exemplares: o 409 aqui é duplicidade, não falta de exemplar.
+    livro = criar_livro(2)
+    usuario = criar_usuario()
+
+    criado = emprestar(livro["id"], usuario["id"])
+    assert criado.status_code == 201
+
+    resposta = emprestar(livro["id"], usuario["id"])
+
+    assert resposta.status_code == 409
+    assert resposta.get_json()["erro"]["codigo"] == "EMPRESTIMO_DUPLICADO"
+
+    # Devolvido, o mesmo usuário pode pegar o mesmo livro de novo.
+    emprestimo_id = criado.get_json()["id"]
+    cliente.patch(f"/API/emprestimos/{emprestimo_id}/devolucao")
+
+    assert emprestar(livro["id"], usuario["id"]).status_code == 201
+
+
 def test_devolve_o_livro_e_permite_um_novo_emprestimo(
     cliente, criar_livro, criar_usuario, emprestar
 ):

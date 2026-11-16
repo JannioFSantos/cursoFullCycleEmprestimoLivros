@@ -72,6 +72,7 @@ class EstadoParaEmprestar:
     emprestimos_ativos_do_livro: int
     emprestimos_ativos_do_usuario: int
     usuario_tem_atraso: bool
+    usuario_ja_tem_emprestimo_do_livro: bool = False
 
 
 @dataclass(frozen=True)
@@ -119,12 +120,16 @@ def validar_emprestimo(
     estado: EstadoParaEmprestar,
     limite_de_emprestimos: int = LIMITE_PADRAO_DE_EMPRESTIMOS,
 ) -> None:
-    """Valida as três regras de empréstimo na ordem em que fazem sentido.
+    """Valida as regras de empréstimo na ordem em que fazem sentido.
 
-    Primeiro "tem livro?", depois "você está em atraso?", depois "atingiu o
-    limite?". Lançar erro em vez de retornar booleano é proposital: o caso de
-    uso não precisa montar if/else, e a mensagem já sai pronta para a API.
+    Primeiro "essa pessoa já está com este livro?", depois "tem exemplar?",
+    depois "você está em atraso?" e por fim "atingiu o limite?". Lançar erro em
+    vez de retornar booleano é proposital: o caso de uso não precisa montar
+    if/else, e a mensagem já sai pronta para a API.
     """
+    if estado.usuario_ja_tem_emprestimo_do_livro:
+        raise erros.emprestimo_duplicado()
+
     disponiveis = calcular_disponiveis(
         estado.exemplares_total,
         estado.emprestimos_ativos_do_livro,

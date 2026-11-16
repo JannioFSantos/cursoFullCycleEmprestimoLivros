@@ -22,6 +22,7 @@ anterior em TypeScript. Quem já usava os endpoints não precisa mudar nada.
 - lista livros, usuários e empréstimos (com o nome de quem pegou);
 - empresta um livro por 14 dias;
 - não deixa emprestar se não tem exemplar disponível;
+- não deixa o mesmo usuário pegar de novo um livro que ele já está com;
 - não deixa emprestar se o usuário está com livro atrasado;
 - não deixa o usuário ter mais de 3 empréstimos ativos;
 - registra a devolução;
@@ -168,6 +169,9 @@ Para testar a regra do último exemplar, cadastre um segundo usuário e tente
 emprestar o mesmo livro. A resposta vai ser `409` com o código
 `LIVRO_INDISPONIVEL`.
 
+Para testar a regra da duplicidade, tente emprestar o mesmo livro de novo para
+quem já está com ele: a resposta é `409` com o código `EMPRESTIMO_DUPLICADO`.
+
 ## Documentação da API (Swagger)
 
 A própria API publica a documentação dela. Com a API rodando, abra no
@@ -213,8 +217,8 @@ um livro ali, ele fica no banco de verdade e aparece em `GET /API/livros`.
 ## Testes
 
 ```bash
-pytest tests/unit          # 39 testes, sem banco, roda em ~1s
-pytest tests/integration   # 20 testes, com banco real
+pytest tests/unit          # 42 testes, sem banco, roda em ~1s
+pytest tests/integration   # 21 testes, com banco real
 pytest --cov               # tudo + cobertura
 ```
 
@@ -222,7 +226,8 @@ O que os testes cobrem:
 
 - cálculo da data de devolução (inclusive virada de mês);
 - livro que vence hoje não está atrasado, que venceu ontem está;
-- as três regras de recusa: sem exemplar, atraso e limite de 3;
+- as quatro regras de recusa: sem exemplar, livro repetido para o mesmo
+  usuário, atraso e limite de 3;
 - livro, usuário ou empréstimo que não existe (404);
 - devolver o mesmo empréstimo duas vezes (409);
 - editar livro e usuário, inclusive 404 para id inexistente;
@@ -274,7 +279,7 @@ As regras de negócio ficam em `app/domain`, e o acesso ao banco fica em
 `app/infra`. No meio deles existe uma interface
 (`app/domain/repositorios.py`), implementada com SQLAlchemy.
 
-Fiz isso para conseguir testar as regras sem subir banco. Os 39 testes
+Fiz isso para conseguir testar as regras sem subir banco. Os 42 testes
 unitários rodam em memória, com repositórios falsos (`tests/fakes.py`).
 
 ### 2. Usei transação para o último exemplar
@@ -318,9 +323,10 @@ Todos os erros têm o mesmo formato:
 ```
 
 Códigos usados: `LIVRO_NAO_ENCONTRADO`, `USUARIO_NAO_ENCONTRADO`,
-`EMPRESTIMO_NAO_ENCONTRADO`, `LIVRO_INDISPONIVEL`, `USUARIO_COM_ATRASO`,
-`LIMITE_ATINGIDO`, `EMPRESTIMO_JA_DEVOLVIDO`, `VALOR_JA_CADASTRADO`,
-`EXEMPLARES_ABAIXO_DOS_EMPRESTIMOS` e `DADOS_INVALIDOS`.
+`EMPRESTIMO_NAO_ENCONTRADO`, `EMPRESTIMO_DUPLICADO`, `LIVRO_INDISPONIVEL`,
+`USUARIO_COM_ATRASO`, `LIMITE_ATINGIDO`, `EMPRESTIMO_JA_DEVOLVIDO`,
+`VALOR_JA_CADASTRADO`, `EXEMPLARES_ABAIXO_DOS_EMPRESTIMOS` e
+`DADOS_INVALIDOS`.
 
 ### 5. Exclusão com histórico é lógica, não física
 

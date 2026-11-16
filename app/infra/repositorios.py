@@ -457,6 +457,16 @@ class SqlAlchemyEmprestimoRepositorio:
                 .limit(1)
             )
 
+            ja_tem_emprestimo_do_livro = sessao.scalar(
+                select(EmprestimoModelo.id)
+                .where(
+                    EmprestimoModelo.livro_id == dados.livro_id,
+                    EmprestimoModelo.usuario_id == dados.usuario_id,
+                    EmprestimoModelo.status == StatusEmprestimo.ATIVO,
+                )
+                .limit(1)
+            )
+
             # A regra de negócio é a MESMA função pura testada nos unitários.
             # Se ela lançar erro, a transação é desfeita automaticamente.
             validar(
@@ -465,6 +475,9 @@ class SqlAlchemyEmprestimoRepositorio:
                     emprestimos_ativos_do_livro=emprestimos_ativos_do_livro,
                     emprestimos_ativos_do_usuario=emprestimos_ativos_do_usuario,
                     usuario_tem_atraso=emprestimo_em_atraso is not None,
+                    usuario_ja_tem_emprestimo_do_livro=(
+                        ja_tem_emprestimo_do_livro is not None
+                    ),
                 )
             )
 

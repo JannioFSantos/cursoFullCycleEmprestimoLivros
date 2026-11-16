@@ -294,6 +294,7 @@ paths:
         Cria um empréstimo ATIVO com prazo de 14 dias.
 
         Pode responder 409 com um destes códigos:
+        - `EMPRESTIMO_DUPLICADO` (o usuário já está com este livro)
         - `LIVRO_INDISPONIVEL`
         - `USUARIO_COM_ATRASO`
         - `LIMITE_ATINGIDO`

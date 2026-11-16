@@ -112,6 +112,24 @@ def test_recusa_quando_nao_ha_exemplar_disponivel(cenario):
     assert erro.value.codigo == "LIVRO_INDISPONIVEL"
 
 
+def test_recusa_o_mesmo_livro_para_o_mesmo_usuario(cenario):
+    livros, usuarios, emprestimos, caso_de_uso = cenario
+    livro, usuario = preparar(livros, usuarios, 2)
+
+    caso_de_uso.executar(
+        EntradaEmprestarLivro(livro_id=livro.id, usuario_id=usuario.id)
+    )
+
+    with pytest.raises(ErroDeDominio) as erro:
+        caso_de_uso.executar(
+            EntradaEmprestarLivro(livro_id=livro.id, usuario_id=usuario.id)
+        )
+
+    assert erro.value.codigo == "EMPRESTIMO_DUPLICADO"
+    assert erro.value.status_code == 409
+    assert len(emprestimos.emprestimos) == 1
+
+
 def test_recusa_usuario_com_emprestimo_em_atraso(cenario):
     livros, usuarios, emprestimos, caso_de_uso = cenario
 
